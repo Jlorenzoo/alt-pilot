@@ -1,0 +1,63 @@
+#!/usr/bin/env python3
+"""Bounded read/ack endpoint for validated in-game whitelist requests."""
+import json
+import os
+import pwd
+import re
+import stat
+import sys
+from pathlib import Path
+
+BASE = Path('/home/mc/slots')
+ID = re.compile(r'^[a-f0-9]{32}$')
+NAME = re.compile(r'^\.?[A-Za-z0-9_]{1,32}$')
+
+def folder(slot):
+    path = BASE / str(slot) / 'chat-requests'
+    if any(p.is_symlink() for p in (BASE.parent, BASE, path.parent, path)):
+        raise ValueError('Symlinked inbox is not allowed')
+    return path
+
+def read_request(path, uid):
+    fd = os.open(path, os.O_RDONLY | os.O_NOFOLLOW | os.O_NONBLOCK)
+    try:
+        info = os.fstat(fd)
+        if not stat.S_ISREG(info.st_mode) or info.st_uid != uid or info.st_size > 2048:
+            raise ValueError('Unsafe request file')
+        value = json.loads(os.read(fd, 2049))
+        if not isinstance(value, dict):
+            raise ValueError('Invalid request object')
+        if not isinstance(value.get('sender'), str) or not NAME.fullmatch(value['sender']):
+            raise ValueError('Invalid player name')
+        if value.get('operation') != 'restart' and (not isinstance(value.get('target'), str) or not NAME.fullmatch(value['target'])):
+            raise ValueError('Invalid target name')
+        if value.get('operation') not in ('add', 'remove', 'restart'):
+            raise ValueError('Invalid whitelist operation')
+        return value
+    finally:
+        os.close(fd)
+
+def main():
+    uid = pwd.getpwnam('mc').pw_uid
+    if sys.argv[1:] == ['list']:
+        rows = []
+        for slot in range(1, 11):
+            path = folder(slot)
+            if not path.is_dir(): continue
+            for file in sorted(path.glob('*.json'))[:20]:
+                if not ID.fullmatch(file.stem): continue
+                try: value = read_request(file, uid)
+                except (ValueError, OSError, TypeError, json.JSONDecodeError): continue
+                rows.append(dict(value, slot=slot, id=file.stem))
+                if len(rows) >= 20: break
+            if len(rows) >= 20: break
+        print(json.dumps(rows))
+    elif len(sys.argv) == 4 and sys.argv[1] == 'ack' and sys.argv[2].isdigit() and 1 <= int(sys.argv[2]) <= 10 and ID.fullmatch(sys.argv[3]):
+        path = folder(int(sys.argv[2])) / (sys.argv[3] + '.json')
+        if path.exists():
+            read_request(path, uid)
+            path.unlink()
+        print('acknowledged')
+    else:
+        raise SystemExit('Usage: alt-pilot-chat-inbox list | ack SLOT ID')
+if __name__ == '__main__': main()

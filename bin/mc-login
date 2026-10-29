@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# The host-side supervisor owns the timeout, per-slot lock and all descendants.
+set -Eeuo pipefail
+export DOTNET_BUNDLE_EXTRACT_BASE_DIR=/opt/alt-pilot/mcc/bundle-cache
+exec /usr/bin/python3 /usr/local/bin/alt-pilot-login.py "$@"

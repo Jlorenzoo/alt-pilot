@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=ALT Pilot
+GenericName=ALT Pilot · 24/7 MC-alts
+Comment=ALT Pilot — 24/7 MC-alts: headless Minecraft clients on Oracle Always Free
+Exec=python3 %PKG_DIR%/control_center.py
+Icon=%PKG_DIR%/icon.svg
+Terminal=false
+Categories=Game;
+Keywords=alt-pilot;mc;alts;minecraft;afk;oracle;cloud;server;
+StartupNotify=true
+StartupWMClass=ALTPilot

@@ -1,0 +1,36 @@
+# Per-machine deployment state. This includes remote-control credentials,
+# SSH private keys, cloud instance details, and local UI preferences.
+.state/
+
+# Credentials and machine-local configuration must never enter Git history.
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.crt
+*.csr
+*.kdbx
+*.sqlite
+*.sqlite3
+*.db
+*.log
+
+# Python cache & artifacts
+__pycache__/
+*.py[cod]
+
+# Editor and OS metadata
+.DS_Store
+.idea/
+.vscode/
+
+# Installed Bedrock dependencies
+node_modules/
+
+# Local evidence and scratch captures
+/storage/
+*.pcap
+*.pcapng

@@ -1,0 +1,42 @@
+#!/usr/bin/env bash
+# afk-status — report Minecraft AFK service state
+set -e
+UNIT=alt-pilot.service
+if ! systemctl list-unit-files "$UNIT" >/dev/null 2>&1; then
+  echo "Service $UNIT not installed on this VM." >&2
+  exit 1
+fi
+
+ACTIVE="$(systemctl is-active "$UNIT" 2>/dev/null || true)"
+ACTIVE="${ACTIVE:-unknown}"
+echo "Service:    $UNIT  [$ACTIVE]"
+echo "Since:      $(systemctl show "$UNIT" --property=ActiveEnterTimestamp --value 2>/dev/null)"
+echo "PID:        $(systemctl show "$UNIT" --property=MainPID --value 2>/dev/null)"
+
+PID="$(systemctl show "$UNIT" --property=MainPID --value 2>/dev/null)"
+if [[ "$PID" =~ ^[0-9]+$ ]] && [[ "$PID" -gt 0 ]] && [[ -d "/proc/$PID" ]]; then
+  echo "Memory:     $(awk '/VmRSS/{printf "%.0f MB", $2/1024}' /proc/$PID/status 2>/dev/null) RSS"
+  echo "CPU time:   $(awk '{print $1+$2}' /proc/$PID/stat 2>/dev/null) jiffies"
+fi
+
+echo "---"
+echo "MCC procs:"
+# Never print full process arguments: the Minecraft protocol includes
+# short-lived access tokens in child command lines.
+ps -C MinecraftClient -o pid,user,rss,etime,comm --sort=-rss 2>/dev/null \
+  | head -6 || echo "  (none)"
+
+echo "---"
+echo "Total RAM:    $(awk '/MemTotal/{printf "%.0f MB", $2/1024}' /proc/meminfo)"
+echo "Used RAM:     $(awk '/MemAvailable/{free=$2} /MemTotal/{tot=$2} END{printf "%.0f MB (%.0f%% used)", (tot-free)/1024, 100*(tot-free)/tot}' /proc/meminfo)"
+echo "Swap used:    $(awk '/^SwapTotal/{t=$2} /^SwapFree/{f=$2} END{printf "%.0f MB", (t-f)/1024}' /proc/meminfo)"
+
+if sudo -n ss -Hntp state established '( dport = :25565 )' 2>/dev/null | grep -qi MinecraftClient; then
+  echo "Connection:   established (Minecraft port 25565)"
+else
+  echo "Connection:   not detected"
+fi
+
+echo "---"
+echo "Last 3 log lines:"
+sudo -n tail -n 3 /opt/alt-pilot/logs/afk.log 2>/dev/null || echo "  (no log yet)"

@@ -1,0 +1,161 @@
+#!/usr/bin/env bash
+# Machine-readable saved-account health summary for the control centers.
+set -Eeuo pipefail
+
+MC_VERSION=1.12.2 MC_SERVER=eu.mc-complex.com JVM_HEAP_XMS=160m JVM_HEAP_XMX=320m
+if [[ -r /etc/alt-pilot/options.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/alt-pilot/options.env
+fi
+server_port=25565
+[[ "$MC_SERVER" == *:* ]] && server_port="${MC_SERVER##*:}"
+[[ "$server_port" =~ ^[0-9]+$ ]] && (( server_port >= 1 && server_port <= 65535 )) || { echo "Invalid Minecraft server port: $server_port" >&2; exit 1; }
+
+HELPER_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+mcc_profile_name() {
+  local helper="$HELPER_DIR/afk-mcc-profile-name"
+  [[ -x "$helper" ]] || return 0
+  "$helper" "$1" 2>/dev/null || true
+}
+
+unit_json() {
+  local slot="$1" unit="$2"
+  local active="" enabled="" pid="" mem="" since="" active_mono="" now_mono startup_seconds=0 authenticated=false name="" connected=false communication_ready=false cgroup="" socket_pids="" process_pid=""
+  local result="" exit_status="" restart_count="" startup_phase="launcher" edition="java" xuid="" log_file="" recent_log="" connection_marker="" marker_start="" properties="" mcc_cache="" connection_state=""
+  if [[ "$slot" == 1 ]]; then
+    log_file=/opt/alt-pilot/logs/afk.log
+  else
+    log_file="/opt/alt-pilot/logs/afk-${slot}.log"
+  fi
+  mcc_cache="/home/mc/slots/${slot}/mcc/SessionCache.db"
+  properties="$(systemctl show "$unit" \
+    -p ActiveState -p UnitFileState -p MainPID -p MemoryCurrent \
+    -p ActiveEnterTimestamp -p ActiveEnterTimestampMonotonic -p Result \
+    -p ExecMainStatus -p NRestarts -p ControlGroup 2>/dev/null || true)"
+  while IFS='=' read -r key val; do
+    case "$key" in
+      ActiveState) active="$val" ;;
+      UnitFileState) enabled="$val" ;;
+      MainPID) pid="$val" ;;
+      MemoryCurrent) mem="$val" ;;
+      ActiveEnterTimestamp) since="$val" ;;
+      ActiveEnterTimestampMonotonic) active_mono="$val" ;;
+      Result) result="$val" ;;
+      ExecMainStatus) exit_status="$val" ;;
+      NRestarts) restart_count="$val" ;;
+      ControlGroup) cgroup="$val" ;;
+    esac
+  done <<<"$properties"
+  [[ "$pid" =~ ^[0-9]+$ ]] || pid=0
+  [[ "$mem" =~ ^[0-9]+$ ]] || mem=0
+  [[ "$active_mono" =~ ^[0-9]+$ ]] || active_mono=0
+  [[ "$exit_status" =~ ^[0-9]+$ ]] || exit_status=0
+  [[ "$restart_count" =~ ^[0-9]+$ ]] || restart_count=0
+  [[ "${active:-}" == active ]] || since=""
+  if [[ "${active:-}" == active && "$active_mono" -gt 0 ]]; then
+    now_mono="$(awk '{printf "%.0f", $1 * 1000000}' /proc/uptime)"
+    if [[ "$now_mono" =~ ^[0-9]+$ && "$now_mono" -ge "$active_mono" ]]; then
+      startup_seconds=$(( (now_mono - active_mono) / 1000000 ))
+    fi
+  fi
+  if [[ -s "$mcc_cache" ]]; then
+    name="$(mcc_profile_name "$mcc_cache")"
+    [[ -n "$name" ]] && authenticated=true
+  fi
+  if [[ -r "/home/mc/slots/${slot}/account.json" ]] && [[ "$(jq -r '.edition' "/home/mc/slots/${slot}/account.json")" == bedrock ]]; then
+    edition=bedrock
+    name="$(jq -r '.name // empty' "/home/mc/slots/${slot}/account.json")"
+    xuid="$(jq -r '.xuid // empty' "/home/mc/slots/${slot}/account.json")"
+    [[ -n "$name" && -n "$xuid" && -s "/home/mc/slots/${slot}/bedrock/profile.json" ]] && authenticated=true
+    # Complex uses Floodgate's default prefix and replaces gamertag spaces.
+    name=".${name// /_}"
+  fi
+  if [[ "$active" == active ]]; then
+    socket_pids="$(ss -Hntp state established "( dport = :$server_port )" 2>/dev/null | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u || true)"
+    if [[ -r "/sys/fs/cgroup${cgroup}/cgroup.procs" ]]; then
+      while read -r process_pid; do
+        if grep -qx "$process_pid" <<<"$socket_pids"; then connected=true; break; fi
+      done < "/sys/fs/cgroup${cgroup}/cgroup.procs"
+    fi
+    recent_log="$(tail -n 900 "$log_file" 2>/dev/null | tac | sed '/\[ALT-PILOT\].*[Ss]tartup began/q' | tac || true)"
+    if grep -Eq 'Server was successfully joined|Forge Mod Loader has successfully loaded|Attempting connection' <<<"$recent_log"; then
+      startup_phase="joining"
+    elif grep -Eq 'Connecting to|Checking Session|Launching version|\[Client thread/' <<<"$recent_log"; then
+      startup_phase="loading"
+    fi
+  fi
+  if [[ "$edition" == bedrock && "$active" == active ]]; then
+    connected=false
+    connection_state="$("$HELPER_DIR/afk-bedrock-connected" "$slot" "$cgroup" --status)"
+    [[ "$connection_state" == connected ]] && connected=true
+  fi
+  connection_marker="/run/alt-pilot-connected-${slot}"
+  if [[ "$connected" == true ]]; then
+    printf '%s\n' "$active_mono" > "$connection_marker"
+  elif [[ "$active" == active && -r "$connection_marker" ]]; then
+    marker_start="$(cat "$connection_marker" 2>/dev/null || true)"
+    if [[ "$connection_state" == delayed || "$connection_state" == unresponsive ]]; then
+      startup_phase="$connection_state"
+    elif [[ "$marker_start" == "$active_mono" ]]; then startup_phase="disconnected"; fi
+  elif [[ "$active" != active ]]; then
+    rm -f "$connection_marker"
+  fi
+  if [[ "$connected" == true && -p "/home/mc/slots/${slot}/control.fifo" ]]; then
+    communication_ready=true
+  fi
+  slot_settings_file="/home/mc/slots/${slot}/settings.json"
+  slot_settings_json='{"startup_command_enabled":false,"startup_command":"/home alt","startup_delay":5,"anti_afk":false,"tpa_auto_accept":false,"tpa_whitelist":"","purpose":""}'
+  raw_settings=""
+  if [[ -r "$slot_settings_file" ]]; then
+    raw_settings="$(cat "$slot_settings_file" 2>/dev/null || true)"
+  elif [[ -f "$slot_settings_file" ]] && command -v sudo >/dev/null 2>&1; then
+    raw_settings="$(sudo -n cat "$slot_settings_file" 2>/dev/null || true)"
+  fi
+  if [[ -n "$raw_settings" ]]; then
+    parsed_settings="$(jq -c '{startup_command_enabled: (.startup_command_enabled == true), startup_command: (.startup_command // "/home alt"), startup_delay: (.startup_delay // 5), anti_afk: (.anti_afk == true), tpa_auto_accept: (.tpa_auto_accept == true), tpa_whitelist: (.tpa_whitelist // ""), purpose: (.purpose // "")}' <<<"$raw_settings" 2>/dev/null || true)"
+    [[ -n "$parsed_settings" ]] && slot_settings_json="$parsed_settings"
+  fi
+  jq -n --argjson slot "$slot" --arg unit "$unit" --arg name "$name" \
+    --arg connection_state "$connection_state" --arg edition "$edition" --arg xuid "$xuid" --arg service "$active" --arg enabled "$enabled" --arg since "$since" --arg result "$result" --arg startup_phase "$startup_phase" \
+    --argjson authenticated "$authenticated" --argjson connected "$connected" --argjson communication_ready "$communication_ready" \
+    --argjson pid "$pid" --argjson memory_bytes "$mem" --argjson startup_seconds "$startup_seconds" \
+    --argjson exit_status "$exit_status" --argjson restart_count "$restart_count" \
+    --argjson settings "$slot_settings_json" \
+    '{slot:$slot,unit:$unit,name:$name,edition:$edition,xuid:$xuid,authenticated:$authenticated,service:$service,enabled:$enabled,connected:$connected,connection_state:$connection_state,communication_ready:$communication_ready,pid:$pid,memory_bytes:$memory_bytes,since:$since,startup_seconds:$startup_seconds,startup_phase:$startup_phase,result:$result,exit_status:$exit_status,restart_count:$restart_count,settings:$settings}'
+}
+
+accounts='[]'
+append_account() {
+  local item
+  item="$(unit_json "$@")"
+  if jq -e '.authenticated and (.name | length > 0)' <<<"$item" >/dev/null; then
+    accounts="$(jq -nc --argjson accounts "$accounts" --argjson item "$item" '$accounts + [$item]')"
+  fi
+}
+
+append_account 1 alt-pilot.service
+for slot in {2..10}; do
+  [[ -d "/home/mc/slots/$slot" ]] || continue
+  [[ -s "/home/mc/slots/$slot/mcc/SessionCache.db" || -s "/home/mc/slots/$slot/account.json" ]] || continue
+  unit="alt-pilot@${slot}.service"
+  append_account "$slot" "$unit"
+done
+mem_total="$(awk '/MemTotal/{print $2*1024}' /proc/meminfo)"
+mem_avail="$(awk '/MemAvailable/{print $2*1024}' /proc/meminfo)"
+swap_total="$(awk '/SwapTotal/{print $2*1024}' /proc/meminfo)"
+swap_free="$(awk '/SwapFree/{print $2*1024}' /proc/meminfo)"
+disk="$(df -B1 --output=used / | tail -1 | tr -d ' ')"
+installed=false; command -v alt-pilot-mcc-run >/dev/null 2>&1 && installed=true
+
+jq -nc --argjson accounts "$accounts" --argjson installed "$installed" \
+  --argjson memory_total "$mem_total" --argjson memory_available "$mem_avail" \
+  --argjson swap_total "$swap_total" --argjson swap_used "$((swap_total-swap_free))" \
+  --argjson disk_used "$disk" --arg version "$MC_VERSION" --arg server "$MC_SERVER" \
+  --arg heap_min "$JVM_HEAP_XMS" --arg heap_max "$JVM_HEAP_XMX" \
+  '($accounts[0] // {authenticated:false,service:"inactive",enabled:"disabled",connected:false,pid:0,memory_bytes:0,since:""}) as $primary |
+   {reachable:true,installed:$installed,slots_supported:true,max_accounts:10,max_online:5,accounts:$accounts,
+    authenticated:$primary.authenticated,service:$primary.service,enabled:$primary.enabled,connected:$primary.connected,
+    pid:$primary.pid,memory_bytes:$primary.memory_bytes,since:$primary.since,
+    memory_total:$memory_total,memory_available:$memory_available,swap_total:$swap_total,swap_used:$swap_used,disk_used:$disk_used,
+    settings:{ssh_user:"ubuntu",minecraft_version:$version,minecraft_server:$server,heap_min:$heap_min,heap_max:$heap_max}}'

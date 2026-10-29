@@ -1,0 +1,142 @@
+#!/usr/bin/env bash
+# Restore Minecraft sessions that reached the server and later lost their TCP
+# connection while the launcher JVM remained alive at the multiplayer menu.
+set -Eeuo pipefail
+
+MC_SERVER=eu.mc-complex.com
+if [[ -r /etc/alt-pilot/options.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/alt-pilot/options.env
+fi
+server_port=25565
+[[ "$MC_SERVER" == *:* ]] && server_port="${MC_SERVER##*:}"
+[[ "$server_port" =~ ^[0-9]+$ ]] && (( server_port >= 1 && server_port <= 65535 )) || { echo "Invalid Minecraft server port: $server_port" >&2; exit 1; }
+STARTUP_RETRY_SECONDS="${STARTUP_RETRY_SECONDS:-1200}"
+[[ "$STARTUP_RETRY_SECONDS" =~ ^[0-9]+$ ]] || { echo "Invalid startup retry interval" >&2; exit 1; }
+
+unit_for_slot() {
+  if [[ "$1" == 1 ]]; then printf '%s\n' alt-pilot.service; else printf 'alt-pilot@%s.service\n' "$1"; fi
+}
+
+socket_pids="$(ss -Hntp state established "( dport = :$server_port )" 2>/dev/null \
+  | grep -o 'pid=[0-9]*' | cut -d= -f2 | sort -u || true)"
+
+for slot in {1..10}; do
+  # Slots 1 and 2 are always installed; higher slots only exist after an
+  # isolated MCC profile has been created.
+  if (( slot > 2 )) && [[ ! -d "/home/mc/slots/${slot}" ]]; then
+    continue
+  fi
+  unit="$(unit_for_slot "$slot")"
+  connected_marker="/run/alt-pilot-watchdog-connected-${slot}"
+  candidate_marker="/run/alt-pilot-watchdog-candidate-${slot}"
+  miss_marker="/run/alt-pilot-watchdog-misses-${slot}"
+  properties="$(systemctl show "$unit" -p LoadState -p ActiveState \
+    -p ActiveEnterTimestampMonotonic -p InactiveEnterTimestampMonotonic -p ControlGroup 2>/dev/null || true)"
+  [[ "$(sed -n 's/^LoadState=//p' <<<"$properties")" == loaded ]] || continue
+  active="$(sed -n 's/^ActiveState=//p' <<<"$properties")"
+  active_mono="$(sed -n 's/^ActiveEnterTimestampMonotonic=//p' <<<"$properties")"
+  cgroup="$(sed -n 's/^ControlGroup=//p' <<<"$properties")"
+  [[ "$active_mono" =~ ^[0-9]+$ ]] || active_mono=0
+
+  # A failed service is different from a deliberate stop (inactive). Recover
+  # failures as a second line of defense if systemd ever exhausts its retries.
+  if [[ "$active" == failed ]]; then
+    failed_mono="$(sed -n 's/^InactiveEnterTimestampMonotonic=//p' <<<"$properties")"
+    now_mono="$(awk '{printf "%.0f", $1 * 1000000}' /proc/uptime)"
+    if [[ "$failed_mono" =~ ^[0-9]+$ && "$now_mono" =~ ^[0-9]+$ ]] \
+      && (( now_mono - failed_mono >= 120000000 )); then
+      logger -t alt-pilot-watchdog "Account $slot service failed; rearming automatic recovery for $unit"
+      if systemctl reset-failed "$unit"; then
+        systemctl start --no-block "$unit" || logger -t alt-pilot-watchdog "Account $slot recovery could not be queued"
+      fi
+    fi
+  fi
+
+  if [[ "$active" != active || "$active_mono" -eq 0 ]]; then
+    rm -f "$connected_marker" "$candidate_marker" "$miss_marker"
+    continue
+  fi
+
+  connected=false
+  if [[ -r "/sys/fs/cgroup${cgroup}/cgroup.procs" ]]; then
+    while read -r process_pid; do
+      if grep -qx "$process_pid" <<<"$socket_pids"; then
+        connected=true
+        break
+      fi
+    done < "/sys/fs/cgroup${cgroup}/cgroup.procs"
+  fi
+
+  if [[ "$(jq -r '.edition // "java"' "/home/mc/slots/${slot}/account.json" 2>/dev/null || true)" == bedrock ]]; then
+    connected=false
+    bedrock_state="$(/usr/local/bin/afk-bedrock-connected "$slot" "$cgroup" --status)"
+    if [[ "$bedrock_state" == connected ]]; then connected=true; fi
+    if [[ "$bedrock_state" == delayed ]]; then
+      # A stale JavaScript heartbeat is not a server disconnect. Give a busy
+      # event loop time to recover without destroying the live WebRTC session.
+      rm -f "$miss_marker"
+      continue
+    fi
+  fi
+
+  if [[ "$connected" == true ]]; then
+    rm -f "$miss_marker"
+    timeout 10 /usr/bin/python3 /usr/local/sbin/alt-pilot-hub-recovery.py "$slot" "$active_mono" \
+      || logger -t alt-pilot-watchdog "Account $slot hub recovery failed; continuing other account checks"
+    if [[ "$(cat "$connected_marker" 2>/dev/null || true)" == "$active_mono" ]]; then
+      rm -f "$candidate_marker"
+      continue
+    fi
+
+    candidate_start=""; samples=0
+    if [[ -r "$candidate_marker" ]]; then
+      read -r candidate_start samples < "$candidate_marker" || true
+    fi
+    [[ "$candidate_start" == "$active_mono" && "$samples" =~ ^[0-9]+$ ]] || samples=0
+    samples=$((samples + 1))
+    if (( samples >= 3 )); then
+      printf '%s\n' "$active_mono" > "$connected_marker"
+      rm -f "$candidate_marker"
+      logger -t alt-pilot-watchdog "Account $slot has a stable server connection; recovery armed"
+    else
+      printf '%s %s\n' "$active_mono" "$samples" > "$candidate_marker"
+    fi
+
+    continue
+  fi
+
+  # Allow a generous initial connection window before retrying a stuck client.
+  # Two consecutive misses filter brief socket races after a stable connection.
+  if [[ "$(cat "$connected_marker" 2>/dev/null || true)" != "$active_mono" ]]; then
+    rm -f "$candidate_marker" "$miss_marker"
+    now_mono="$(awk '{printf "%.0f", $1 * 1000000}' /proc/uptime)"
+    if [[ "$now_mono" =~ ^[0-9]+$ && "$now_mono" -ge "$active_mono" ]] \
+      && (( (now_mono - active_mono) / 1000000 >= STARTUP_RETRY_SECONDS )); then
+      logger -t alt-pilot-watchdog "Account $slot did not establish a stable connection within ${STARTUP_RETRY_SECONDS}s; retrying $unit"
+      systemctl restart --no-block "$unit" || logger -t alt-pilot-watchdog "Account $slot restart could not be queued"
+    fi
+    continue
+  fi
+  # Complex explicitly promises to transfer clients back after its scheduled
+  # reboot. Keep the current session alive through that window.
+  if /usr/bin/python3 /usr/local/sbin/alt-pilot-hub-recovery.py "$slot" "$active_mono" --defer-restart; then
+    rm -f "$miss_marker"
+    continue
+  fi
+  miss_start=""; misses=0
+  if [[ -r "$miss_marker" ]]; then
+    read -r miss_start misses < "$miss_marker" || true
+  fi
+  [[ "$miss_start" == "$active_mono" && "$misses" =~ ^[0-9]+$ ]] || misses=0
+  misses=$((misses + 1))
+  printf '%s %s\n' "$active_mono" "$misses" > "$miss_marker"
+  if (( misses < 2 )); then
+    logger -t alt-pilot-watchdog "Account $slot lost its server connection; confirming before recovery"
+    continue
+  fi
+
+  logger -t alt-pilot-watchdog "Account $slot remained disconnected; restarting $unit"
+  rm -f "$miss_marker"
+  systemctl restart --no-block "$unit" || logger -t alt-pilot-watchdog "Account $slot restart could not be queued"
+done

@@ -1,0 +1,79 @@
+#!/usr/bin/env bash
+# Bounded, selected-account view of incoming chat and manually sent lines.
+set -Eeuo pipefail
+
+# Treat game-owned files as hostile even when this helper is invoked by sudo.
+if [[ "$(id -u)" == 0 ]]; then
+  exec /usr/sbin/runuser -u mc -- "$0" "$@"
+fi
+
+slot="${1:-}"
+[[ "$slot" =~ ^([1-9]|10)$ ]] || { echo "Account number must be between 1 and 10." >&2; exit 2; }
+if [[ "$slot" == 1 ]]; then game_log=/opt/alt-pilot/logs/afk.log; else game_log="/opt/alt-pilot/logs/afk-${slot}.log"; fi
+sent_log="/home/mc/slots/${slot}/console.log"
+# MCC only writes a clock time.  Convert it to the most recent occurrence of
+# that time, rather than lexically sorting HH:MM:SS (which breaks at midnight).
+now_epoch="${CONSOLE_NOW_EPOCH:-$(date +%s)}"
+now_clock="${CONSOLE_NOW_CLOCK:-$(date +%H:%M:%S)}"
+
+{
+tail -n 800 "$game_log" 2>/dev/null \
+    | awk -v now_epoch="$now_epoch" -v now_clock="$now_clock" '
+      function clock_seconds(value) {
+        return substr(value, 1, 2) * 3600 + substr(value, 4, 2) * 60 + substr(value, 7, 2)
+      }
+      {
+        line = $0
+        sub(/\r$/, "", line)
+        # A colour mode must never hide the timestamp this view sorts on.
+        sub(/^(\033\[[0-9;?]*[ -\/]*[@-~])+/, "", line)
+        if (match(line, /^\[[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\] ?/)) {
+          stamp = substr(line, 2, 8)
+        } else if (match(line, /^[0-9][0-9]:[0-9][0-9]:[0-9][0-9] /)) {
+          stamp = substr(line, 1, 8)
+        } else {
+          next
+        }
+        message = substr(line, RLENGTH + 1)
+        if (message ~ /^Link: /) next
+        sequence += 1
+        event_epoch = now_epoch - (clock_seconds(now_clock) - clock_seconds(stamp))
+        if (event_epoch > now_epoch) event_epoch -= 86400
+        if (message ~ /^\[(ALT-PILOT|MCC)\]/ ||
+            message ~ /\[[^]\/]+\/(WARN|ERROR|FATAL)\]/ ||
+            message ~ /^(GitHub build|Cached session|Using Minecraft version|Server version:|Server reports|Resolving|Connecting to|Checking|Logging in|Session|Waiting|Reconnect|Disconnected|Lost connection|Connection has been lost|Forge Mod Loader)/) {
+          printf "%d\t1\t%06d\t[%s] [CLIENT] %s\n", event_epoch, sequence, stamp, message
+          next
+        }
+        # MCC can echo a sent line as a server row; the audit row below is the
+        # authoritative representation in the operator console.
+        sub(/^[[:space:]]+\[YOU[^]]*\][[:space:]]*/, "", message)
+        if (message ~ /^[[:space:]]*$/) next
+        printf "%d\t1\t%06d\t[%s] [SERVER] %s\n", event_epoch, sequence, stamp, message
+      }
+    '
+  tail -n 120 "$sent_log" 2>/dev/null | awk -v now_epoch="$now_epoch" -v now_clock="$now_clock" '
+      function clock_seconds(value) {
+        return substr(value, 1, 2) * 3600 + substr(value, 4, 2) * 60 + substr(value, 7, 2)
+      }
+      {
+        sequence += 1
+        # New records carry an absolute send time. Legacy records remain
+        # readable and are treated as the most recent matching clock time.
+        if ($0 ~ /^@[0-9]+ \[[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\] \[YOU\] /) {
+          split($1, marker, "@")
+          event_epoch = marker[2]
+          line = substr($0, length($1) + 2)
+        } else if ($0 ~ /^\[[0-9][0-9]:[0-9][0-9]:[0-9][0-9]\] \[YOU\] /) {
+          stamp = substr($0, 2, 8)
+          event_epoch = now_epoch - (clock_seconds(now_clock) - clock_seconds(stamp))
+          if (event_epoch > now_epoch) event_epoch -= 86400
+          line = $0
+        } else {
+          next
+        }
+        # Commands win a same-second tie: the command caused its reply.
+        printf "%d\t0\t%06d\t%s\n", event_epoch, sequence, line
+      }
+    '
+} | LC_ALL=C sort -t $'\t' -k1,1n -k2,2n -k3,3n -s | tail -n 120 | cut -f4-

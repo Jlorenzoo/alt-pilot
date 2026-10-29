@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+if [[ $EUID -eq 0 ]]; then exec systemctl restart alt-pilot.service; fi
+exec sudo -n systemctl restart alt-pilot.service

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <title>ALT Pilot</title>
+  <desc>ALT Pilot beacon mark</desc>
+  <rect x="3" y="3" width="58" height="58" rx="16" fill="#257447"/>
+  <path d="M32 12.5 51 49.5h-9.3L32 30.8l-9.7 18.7H13l19-37Z" fill="#fff"/>
+  <path d="m32 23.3 5.4 10.4h-10.8L32 23.3Z" fill="#257447"/>
+  <circle cx="48.2" cy="15.8" r="3.8" fill="#c9f1d3"/>
+</svg>

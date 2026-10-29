@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# afk-logs — tail the lightweight MCC/Minecraft logs
+LOG=/opt/alt-pilot/logs/afk.log
+if [[ -r $LOG ]]; then exec tail -F "$LOG"; fi
+exec sudo -n tail -F "$LOG"

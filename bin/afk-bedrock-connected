@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# UDP sockets alone do not prove that a Bedrock player has spawned.
+set -Eeuo pipefail
+slot="${1:-}"; cgroup="${2:-}"; mode="${3:-}"
+[[ "$slot" =~ ^([1-9]|10)$ && "$cgroup" == /* ]] || exit 1
+file="/home/mc/slots/$slot/bedrock/status.json"
+status=disconnected
+if [[ -r "$file" && -r "/sys/fs/cgroup${cgroup}/cgroup.procs" ]]; then
+  row="$(jq -r --argjson now "$(date +%s)" '
+    if (.pid | type) != "number" or (.updated | type) != "number" or .updated > $now + 2 then "0 disconnected"
+    else "\(.pid) " + (if .connected == true then
+      if .updated > $now - 35 then "connected"
+      elif .updated > $now - 180 then "delayed" else "unresponsive" end
+    elif .reason == "Connecting" then "connecting" else "disconnected" end) end' "$file" 2>/dev/null || true)"
+  read -r pid candidate <<<"$row" || true
+  if [[ "${pid:-}" =~ ^[1-9][0-9]*$ ]] && grep -qx "$pid" "/sys/fs/cgroup${cgroup}/cgroup.procs"; then
+    status="${candidate:-disconnected}"
+  fi
+fi
+if [[ "$mode" == --status ]]; then printf '%s\n' "$status"; exit 0; fi
+[[ "$status" == connected ]]

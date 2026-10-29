@@ -1,0 +1,98 @@
+#!/usr/bin/env bash
+# Forced-command endpoint for the primary dashboard's dedicated worker key.
+set -Eeuo pipefail
+
+original="${SSH_ORIGINAL_COMMAND:-}"
+# This endpoint receives a deliberately tiny word-only protocol.  Parse it as
+# data (never with eval) so reordering can carry all eight OLD:NEW pairs.
+read -r -a words <<<"$original"
+verb="${words[0]:-}"
+first="${words[1]:-}"
+second="${words[2]:-}"
+third="${words[3]:-}"
+fourth="${words[4]:-}"
+extra_count=$(( ${#words[@]} - 5 ))
+
+valid_slot() { [[ "${1:-}" =~ ^([1-9]|10)$ ]]; }
+
+case "$verb" in
+  chat_inbox)
+    [[ ${#words[@]} -eq 1 ]] || exit 2
+    exec sudo -n /usr/local/sbin/alt-pilot-chat-inbox list
+    ;;
+  chat_ack)
+    valid_slot "$first" || exit 2
+    [[ "$second" =~ ^[a-f0-9]{32}$ && ${#words[@]} -eq 3 ]] || exit 2
+    exec sudo -n /usr/local/sbin/alt-pilot-chat-inbox ack "$first" "$second"
+    ;;
+  health)
+    [[ ${#words[@]} -eq 1 ]] || exit 2
+    exec sudo -n /usr/local/bin/afk-health-json
+    ;;
+  logs)
+    [[ ${#words[@]} -eq 1 ]] || exit 2
+    exec sudo -n /usr/local/bin/afk-control-logs
+    ;;
+  service)
+    [[ "$first" == start || "$first" == stop || "$first" == restart ]] || exit 2
+    valid_slot "$second" || exit 2
+    [[ ${#words[@]} -eq 3 ]] || exit 2
+    exec sudo -n /usr/local/sbin/alt-pilot-account-service "$first" "$second"
+    ;;
+  console)
+    valid_slot "$first" || exit 2
+    [[ ${#words[@]} -eq 2 ]] || exit 2
+    exec sudo -n /usr/local/bin/afk-console-log "$first"
+    ;;
+  send)
+    [[ "$first" == chat || "$first" == command || "$first" == action ]] || exit 2
+    valid_slot "$second" || exit 2
+    [[ ${#words[@]} -eq 3 ]] || exit 2
+    exec sudo -n /usr/local/sbin/alt-pilot-send "$first" "$second"
+    ;;
+  login)
+    valid_slot "$first" || exit 2
+    [[ ${#words[@]} -eq 2 || ${#words[@]} -eq 3 ]] || exit 2
+    edition="${second:-java}"
+    [[ "$edition" == java || "$edition" == bedrock || "$edition" == cancel ]] || exit 2
+    exec sudo -n -u mc -H /usr/local/bin/mc-login "$first" "$edition"
+    ;;
+  signout)
+    valid_slot "$first" || exit 2
+    [[ ${#words[@]} -eq 2 ]] || exit 2
+    exec sudo -n -u mc -H /usr/local/bin/mc-signout "$first"
+    ;;
+  settings)
+    [[ "$first" =~ ^[0-9A-Za-z._:+-]{1,40}$ ]] || exit 2
+    [[ "$second" =~ ^[A-Za-z0-9.-]+(:[0-9]{1,5})?$ ]] || exit 2
+    [[ "$third" =~ ^(128|160|192|224|256|320|384)m$ ]] || exit 2
+    [[ "$fourth" =~ ^(256|320|384|448|512)m$ ]] || exit 2
+    [[ ${#words[@]} -eq 5 ]] || exit 2
+    exec sudo -n /usr/local/sbin/alt-pilot-set-options "$first" "$second" "$third" "$fourth"
+    ;;
+  account_settings)
+    valid_slot "$first" || exit 2
+    [[ "$second" =~ ^[01]$ ]] || exit 2
+    [[ "$third" =~ ^[0-9]+$ ]] && (( third >= 0 && third <= 60 )) || exit 2
+    if [[ ${#words[@]} -ge 7 && "${words[4]}" =~ ^[01]$ ]]; then
+      tpa_flag="${words[4]}"
+      cmd="$(printf '%s' "${words[5]}" | base64 -d 2>/dev/null || echo '/home alt')"
+      whitelist="$(printf '%s' "${words[6]}" | base64 -d 2>/dev/null || echo '')"
+      purpose=""
+      [[ ${#words[@]} -ge 8 ]] && purpose="$(printf '%s' "${words[7]}" | base64 -d 2>/dev/null || echo '')"
+      exec sudo -n /usr/local/sbin/alt-pilot-set-account-options "$first" "$second" "$third" "$cmd" "$tpa_flag" "$whitelist" "$purpose"
+    else
+      cmd="${words[*]:4}"
+      exec sudo -n /usr/local/sbin/alt-pilot-set-account-options "$first" "$second" "$third" "$cmd"
+    fi
+    ;;
+  reorder)
+    pairs=("${words[@]:1}")
+    [[ ${#pairs[@]} -ge 1 && ${#pairs[@]} -le 8 ]] || { echo "reorder needs one to eight OLD:NEW pairs." >&2; exit 2; }
+    exec sudo -n /usr/local/sbin/alt-pilot-reorder "${pairs[@]}"
+    ;;
+  *)
+    echo "Unsupported peer command." >&2
+    exit 2
+    ;;
+esac

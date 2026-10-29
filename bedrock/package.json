@@ -1,0 +1,29 @@
+{
+  "name": "alt-pilot-bedrock",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Bedrock authentication and passive connection runtime for ALT Pilot",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "test": "node --test *.test.js",
+    "postinstall": "node patch-nethernet.js"
+  },
+  "dependencies": {
+    "bedrock-protocol": "https://api.github.com/repos/PrismarineJS/bedrock-protocol/tarball/b4160368b7e5272ccdd435f75459220c167fe4e4",
+    "prismarine-auth": "3.1.1",
+    "nethernet": "https://api.github.com/repos/PrismarineJS/node-nethernet/tarball/c46db7da4f0e97ec04487648f5759e3f23ff8e9c",
+    "@roamhq/wrtc": "0.10.0"
+  },
+  "overrides": {
+    "nethernet": "$nethernet",
+    "cmake-js": {
+      "axios": "0.34.0",
+      "tar": "7.5.22"
+    },
+    "@azure/msal-node": {
+      "uuid": "11.1.1"
+    }
+  }
+}

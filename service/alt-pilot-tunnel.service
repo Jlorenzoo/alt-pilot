@@ -1,0 +1,30 @@
+[Unit]
+Description=Temporary HTTPS tunnel for ALT Pilot control center
+After=network-online.target alt-pilot-control.service
+Wants=network-online.target alt-pilot-control.service
+
+[Service]
+Type=simple
+User=afk-control
+Group=afk-control
+ExecStart=/usr/local/bin/cloudflared tunnel --no-autoupdate --url http://127.0.0.1:8765
+Restart=on-failure
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectSystem=strict
+ProtectHome=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectHostname=true
+ProtectClock=true
+LockPersonality=true
+RestrictSUIDSGID=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=90M
+
+[Install]
+WantedBy=multi-user.target

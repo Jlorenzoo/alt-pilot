@@ -1,0 +1,6 @@
+[Unit]
+Description=Combined memory guardrail for ALT Pilot Minecraft clients
+
+[Slice]
+MemoryHigh=720M
+MemoryMax=820M

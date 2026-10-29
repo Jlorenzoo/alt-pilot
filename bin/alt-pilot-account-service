@@ -1,0 +1,57 @@
+#!/usr/bin/env bash
+# Narrow, validated systemd gateway used by the restricted web control service.
+set -Eeuo pipefail
+
+action="${1:-}"
+slot="${2:-}"
+[[ "$action" == start || "$action" == stop || "$action" == restart ]] \
+  || { echo "Usage: alt-pilot-account-service start|stop|restart ACCOUNT_NUMBER" >&2; exit 2; }
+[[ "$slot" =~ ^([1-9]|10)$ ]] || { echo "Account number must be between 1 and 10." >&2; exit 2; }
+
+if [[ "$slot" == 1 ]]; then
+  unit=alt-pilot.service
+else
+  unit="alt-pilot@${slot}.service"
+fi
+mcc_auth="/home/mc/slots/${slot}/mcc/SessionCache.db"
+
+if [[ "$action" == start || ( "$action" == restart && "$(systemctl is-active "$unit" 2>/dev/null || true)" != active ) ]]; then
+  if [[ ! -s "$mcc_auth" ]] && ! jq -e '.edition == "bedrock" and (.xuid | length > 0)' "/home/mc/slots/${slot}/account.json" >/dev/null 2>&1; then
+    echo "Account $slot is not signed in yet." >&2
+    exit 1
+  fi
+  active=0
+  [[ "$(systemctl is-active alt-pilot.service 2>/dev/null || true)" == active ]] && active=$((active + 1))
+  while read -r candidate; do
+    [[ -n "$candidate" ]] && active=$((active + 1))
+  done < <(systemctl list-units --state=active --plain --no-legend 'alt-pilot@*.service' 2>/dev/null | awk '{print $1}')
+  max_online="${MAX_ONLINE_PER_HOST:-5}"
+  [[ "$max_online" =~ ^[1-5]$ ]] || max_online=5
+  if (( active >= max_online )) && [[ "$(systemctl is-active "$unit" 2>/dev/null || true)" != active ]]; then
+    echo "$max_online accounts are already running on this host. Stop one before starting account $slot." >&2
+    exit 1
+  fi
+fi
+
+# Apply the edition-specific WebRTC budget to newly added accounts as well.
+# Do this before starting the process so its first world load has enough room.
+dropin="/etc/systemd/system/${unit}.d/bedrock-runtime.conf"
+if [[ "$action" != stop && -r /etc/alt-pilot/bedrock-service.conf ]]; then
+  if jq -e '.edition == "bedrock"' "/home/mc/slots/${slot}/account.json" >/dev/null 2>&1; then
+    if ! cmp -s /etc/alt-pilot/bedrock-service.conf "$dropin"; then
+      install -D -o root -g root -m 644 /etc/alt-pilot/bedrock-service.conf "$dropin"
+      systemctl daemon-reload
+    fi
+  elif [[ -f "$dropin" ]]; then
+    rm -f "$dropin"
+    systemctl daemon-reload
+  fi
+fi
+
+if [[ "$action" == restart ]]; then
+  systemctl stop "$unit"
+  sleep 2
+  exec systemctl start "$unit"
+fi
+
+exec systemctl "$action" "$unit"

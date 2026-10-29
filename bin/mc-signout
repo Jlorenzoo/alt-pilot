@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+# mc-signout — remove the saved Microsoft session for one slot.
+# Idempotent: returns 0 and reports "no saved session" when nothing is stored.
+# Runs as the `mc` user so it can touch /home/mc/slots/<n>/mcc.
+set -Eeuo pipefail
+
+slot="${1:-}"
+[[ "$slot" =~ ^([1-9]|10)$ ]] || { echo "Usage: mc-signout ACCOUNT_NUMBER (1-10)" >&2; exit 2; }
+
+mcc_dir="/home/mc/slots/$slot/mcc"
+
+slot_dir="$(dirname "$mcc_dir")"
+[[ -d "$slot_dir" ]] || { echo "Account $slot had no saved Microsoft session."; exit 0; }
+exec 9>"$slot_dir/login.lock"
+flock -n 9 || { echo "A sign-in is in progress. Wait for it to finish before removing this account." >&2; exit 1; }
+removed=()
+if [[ -d "$slot_dir/bedrock" ]]; then
+  rm -rf "$slot_dir/bedrock"
+  removed+=("Bedrock session")
+fi
+rm -f "$slot_dir/account.json" "$mcc_dir/ProfileKeyCache.ini"
+if [[ -f "$mcc_dir/SessionCache.db" ]]; then
+  rm -f "$mcc_dir/SessionCache.db" && removed+=("MCC session")
+fi
+if [[ -f "$mcc_dir/MinecraftClient.ini" ]]; then
+  tmp="$(mktemp "$mcc_dir/MinecraftClient.ini.XXXXXX")"
+  sed -E 's/^Account = \{.*\}$/Account = { Login = "", Password = "" }/' "$mcc_dir/MinecraftClient.ini" > "$tmp"
+  mv "$tmp" "$mcc_dir/MinecraftClient.ini"
+  chmod 600 "$mcc_dir/MinecraftClient.ini"
+  removed+=("MCC login hint")
+fi
+
+if (( ${#removed[@]} )); then
+  echo "Account $slot signed out (removed: ${removed[*]})."
+else
+  echo "Account $slot had no saved Microsoft session."
+fi

@@ -1,0 +1,159 @@
+#!/usr/bin/env bash
+# Send one validated chat line or slash command to a running account.
+set -Eeuo pipefail
+
+# Treat game-owned files as hostile even when this helper is invoked by sudo.
+if [[ "$(id -u)" == 0 ]]; then
+  exec /usr/sbin/runuser -u mc -- "$0" "$@"
+fi
+
+mode="${1:-}"
+slot="${2:-}"
+[[ "$mode" == chat || "$mode" == command || "$mode" == action ]] \
+  || { echo "Usage: alt-pilot-send chat|command|action ACCOUNT_NUMBER" >&2; exit 2; }
+[[ "$slot" =~ ^([1-9]|10)$ ]] \
+  || { echo "Account number must be between 1 and 10." >&2; exit 2; }
+
+if [[ "$slot" == 1 ]]; then
+  unit=alt-pilot.service
+else
+  unit="alt-pilot@${slot}.service"
+fi
+
+[[ "$(systemctl is-active "$unit" 2>/dev/null || true)" == active ]] \
+  || { echo "Account $slot is not running." >&2; exit 1; }
+
+fifo="/home/mc/slots/${slot}/control.fifo"
+[[ -p "$fifo" && ! -L "$fifo" ]] \
+  || { echo "Account $slot does not have a live communication channel. Restart it after installing the communication update." >&2; exit 1; }
+[[ "$(stat -c '%U:%G:%a' "$fifo" 2>/dev/null || true)" == mc:mc:600 ]] \
+  || { echo "Account $slot communication channel has unsafe permissions." >&2; exit 1; }
+
+IFS= read -r payload || true
+[[ -n "$payload" ]] || { echo "Enter a message, command, or action." >&2; exit 2; }
+[[ ${#payload} -le 100 ]] || { echo "Minecraft messages are limited to 100 characters." >&2; exit 2; }
+if [[ "$payload" =~ [[:cntrl:]] ]]; then
+  echo "Messages cannot contain control characters." >&2
+  exit 2
+fi
+
+check_payload="${payload#/}"
+shopt -s nocasematch
+if [[ "$check_payload" =~ ^(useitem|use|item[[:space:]]+use)([[:space:]]+([1-9]))?$ ]]; then
+  mode=action
+  target_slot="${BASH_REMATCH[3]:-}"
+  payload="use_item${target_slot:+_$target_slot}"
+elif [[ "$check_payload" =~ ^(dropitem|drop|item[[:space:]]+drop)([[:space:]]+([1-9]))?$ ]]; then
+  mode=action
+  target_slot="${BASH_REMATCH[3]:-}"
+  payload="drop_item${target_slot:+_$target_slot}"
+elif [[ "$check_payload" == "use xp" || "$check_payload" == "item use xp" ]]; then
+  mode=action
+  payload=use_xp
+elif [[ "$check_payload" == "item hold xp" ]]; then
+  mode=action
+  payload=hold_xp
+elif [[ "$check_payload" =~ ^(slot|hotbar)[[:space:]]+([1-9])$ ]]; then
+  mode=action
+  payload="slot_${BASH_REMATCH[2]}"
+elif [[ "$check_payload" == "items" || "$check_payload" == "itemstatus" || "$check_payload" == "item status" || "$check_payload" == "inv" || "$check_payload" == "inventory" ]]; then
+  mode=action
+  payload=item_status
+elif [[ "$check_payload" == "xp" || "$check_payload" == "xp?" ]]; then
+  mode=action
+  payload=xp
+elif [[ "$check_payload" == "help" ]]; then
+  mode=action
+  payload=help
+elif [[ "$mode" == command ]]; then
+  payload="$check_payload"
+  [[ -n "$payload" ]] || { echo "Enter a slash command." >&2; exit 2; }
+fi
+shopt -u nocasematch
+
+if [[ "$mode" == action ]]; then
+  if [[ "$payload" =~ ^use_item(_([1-9]))?$ ]]; then
+    target_slot="${BASH_REMATCH[2]:-}"
+    display="[ACTION] Use item (right-click)${target_slot:+ slot $target_slot}"
+    if [[ "$(jq -r '.edition // "java"' "/home/mc/slots/${slot}/account.json" 2>/dev/null || true)" == bedrock ]]; then
+      client_line="\\useitem${target_slot:+ $target_slot}"
+    else
+      client_line='\altitem use'
+    fi
+  elif [[ "$payload" =~ ^drop_item(_([1-9]))?$ ]]; then
+    target_slot="${BASH_REMATCH[2]:-}"
+    display="[ACTION] Drop item${target_slot:+ slot $target_slot}"
+    if [[ -r "/home/mc/slots/${slot}/account.json" ]] && [[ "$(jq -r '.edition // ""' "/home/mc/slots/${slot}/account.json" 2>/dev/null)" == bedrock ]]; then
+      client_line="\\dropitem${target_slot:+ $target_slot}"
+    else
+      client_line='\altitem drop'
+    fi
+  elif [[ "$payload" =~ ^slot_([1-9])$ ]]; then
+    target_slot="${BASH_REMATCH[1]}"
+    display="[ACTION] Select hotbar slot $target_slot"
+    if [[ -r "/home/mc/slots/${slot}/account.json" ]] && [[ "$(jq -r '.edition // ""' "/home/mc/slots/${slot}/account.json" 2>/dev/null)" == bedrock ]]; then
+      client_line="\\slot $target_slot"
+    else
+      client_line="/slot $target_slot"
+    fi
+  elif [[ "$payload" == item_status ]]; then
+    display="[ACTION] Check items"
+    if [[ -r "/home/mc/slots/${slot}/account.json" ]] && [[ "$(jq -r '.edition // ""' "/home/mc/slots/${slot}/account.json" 2>/dev/null)" == bedrock ]]; then
+      client_line='\itemstatus'
+    else
+      client_line='\altitem status'
+    fi
+  elif [[ "$payload" == use_xp ]]; then
+    display="[ACTION] Find and use one XP bottle"
+    if [[ "$(jq -r '.edition // "java"' "/home/mc/slots/${slot}/account.json" 2>/dev/null || true)" == bedrock ]]; then
+      client_line='\use xp'
+    else
+      client_line='\altitem use xp'
+    fi
+  elif [[ "$payload" == hold_xp ]]; then
+    display="[ACTION] Hold XP bottle"
+    if [[ "$(jq -r '.edition // "java"' "/home/mc/slots/${slot}/account.json" 2>/dev/null || true)" == bedrock ]]; then
+      client_line='\item hold xp'
+    else
+      client_line='\altitem hold xp'
+    fi
+  elif [[ "$payload" == xp ]]; then
+    display="[ACTION] Check Experience"
+    if [[ -r "/home/mc/slots/${slot}/account.json" ]] && [[ "$(jq -r '.edition // ""' "/home/mc/slots/${slot}/account.json" 2>/dev/null)" == bedrock ]]; then
+      client_line='\xp'
+    else
+      client_line='\altitem xp'
+    fi
+  elif [[ "$payload" == help ]]; then
+    display="[ACTION] Bot Help"
+    if [[ -r "/home/mc/slots/${slot}/account.json" ]] && [[ "$(jq -r '.edition // ""' "/home/mc/slots/${slot}/account.json" 2>/dev/null)" == bedrock ]]; then
+      client_line='\help'
+    else
+      client_line='\altitem help'
+    fi
+  else
+    echo "Unknown action: $payload" >&2
+    exit 2
+  fi
+elif [[ "$mode" == command ]]; then
+  display="/$payload"
+  client_line="/$payload"
+else
+  display="$payload"
+  client_line="$payload"
+fi
+
+audit_log="/home/mc/slots/${slot}/console.log"
+[[ -f "$audit_log" && ! -L "$audit_log" && "$(stat -c '%U:%G' "$audit_log" 2>/dev/null || true)" == mc:mc ]] \
+  || { echo "The account console audit log is unavailable." >&2; exit 1; }
+
+# A broken or stale FIFO must never hold the web request open indefinitely.
+if ! timeout 3 tee "$fifo" >/dev/null <<<"$client_line"; then
+  echo "The account stopped accepting communication. Restart it and try again." >&2
+  exit 1
+fi
+
+# Prefix new audit events with an absolute timestamp.  MCC itself exposes only
+# HH:MM:SS, so this is what keeps manually sent commands correctly ordered
+# across midnight and after a long-running client session.
+printf '@%(%s)T [%(%H:%M:%S)T] [YOU] %s\n' -1 -1 "$display" >> "$audit_log"

@@ -1,0 +1,86 @@
+#!/usr/bin/env bash
+# alt-pilot-reorder — validate inputs, stop Minecraft services, and
+# physically renumber the per-slot directories and console logs.
+#
+# Invoked by the primary dashboard through the cluster peer forced command
+# (`alt-pilot-peer reorder`) and may also be invoked directly by the
+# restricted `afk-control` user via sudo.
+#
+# Usage:
+#   alt-pilot-reorder OLD:NEW [OLD:NEW ...]
+#
+# All slot numbers must be 1..10 and distinct across the OLD side.
+set -Eeuo pipefail
+
+SLOTS=/home/mc/slots
+LOGS=/opt/alt-pilot/logs
+STAGE=""
+MAX_SLOT=10
+
+if [[ $# -lt 1 ]]; then
+  echo "Usage: alt-pilot-reorder OLD:NEW [OLD:NEW ...]" >&2
+  exit 2
+fi
+
+declare -a olds=()
+declare -a news=()
+for pair in "$@"; do
+  [[ "$pair" =~ ^([1-9]|10)[:]([1-9]|10)$ ]] \
+    || { echo "Invalid pair '$pair' (expected OLD:NEW with slots 1..10)." >&2; exit 2; }
+  old="${BASH_REMATCH[1]}"
+  new="${BASH_REMATCH[2]}"
+  for prev in "${olds[@]:-}"; do
+    [[ "$prev" != "$old" ]] || { echo "Duplicate OLD slot $old." >&2; exit 2; }
+  done
+  for prev in "${news[@]:-}"; do
+    [[ "$prev" != "$new" ]] || { echo "Duplicate NEW slot $new." >&2; exit 2; }
+  done
+  olds+=("$old")
+  news+=("$new")
+done
+
+# A reorder is a permutation of the saved slots.  Never remove a destination
+# that was not staged: it may contain a session the dashboard did not know
+# about, and losing an OAuth token is not recoverable without signing in again.
+for new in "${news[@]}"; do
+  source_slot=false
+  for old in "${olds[@]}"; do [[ "$old" == "$new" ]] && source_slot=true; done
+  if ! "$source_slot" && { [[ -e "$SLOTS/$new" ]] || [[ -e "$LOGS/console-$new.log" ]]; }; then
+    echo "Destination slot $new contains data outside this reorder; sign it out or move it first." >&2
+    exit 1
+  fi
+done
+
+STAGE="$(mktemp -d /tmp/alt-pilot-slot-reorder.XXXXXXXX)"
+trap 'rm -rf "$STAGE"' EXIT
+
+systemctl stop \
+  'alt-pilot@*.service' \
+  'alt-pilot.service' \
+  'alt-pilot-watchdog.timer' \
+  'alt-pilot-watchdog.service'
+
+for old in "${olds[@]}"; do
+  if [[ -d "$SLOTS/$old" ]]; then
+    mv "$SLOTS/$old" "$STAGE/slot-$old"
+  fi
+  if [[ -f "$LOGS/console-$old.log" ]]; then
+    mv "$LOGS/console-$old.log" "$STAGE/console-$old.log"
+  fi
+done
+
+for i in "${!olds[@]}"; do
+  old="${olds[$i]}"
+  new="${news[$i]}"
+  if [[ -d "$STAGE/slot-$old" ]]; then
+    mv "$STAGE/slot-$old" "$SLOTS/$new"
+  fi
+  if [[ -f "$STAGE/console-$old.log" ]]; then
+    mv "$STAGE/console-$old.log" "$LOGS/console-$new.log"
+  fi
+done
+
+rm -rf "$STAGE"
+chown -hR mc:mc "$SLOTS" 2>/dev/null || true
+chown -hR root:mc "$LOGS"
+chmod -R go-w "$LOGS"

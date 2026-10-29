@@ -1,0 +1,120 @@
+#!/usr/bin/env bash
+# Validated privileged account settings writer for the AFK control center.
+set -Eeuo pipefail
+
+# Treat game-owned files as hostile even when this helper is invoked by sudo.
+if [[ "$(id -u)" == 0 ]]; then
+  exec /usr/sbin/runuser -u mc -- "$0" "$@"
+fi
+
+[[ $# -ge 3 ]] || { echo "Expected slot, startup_enabled, startup_delay and optional startup_command, tpa_auto_accept, tpa_whitelist, purpose" >&2; exit 2; }
+slot="$1"
+startup_enabled="$2"
+startup_delay="$3"
+startup_command="${4:-/home alt}"
+tpa_auto_accept="${5:-0}"
+tpa_whitelist="${6:-}"
+purpose="${7:-}"
+
+[[ "$slot" =~ ^([1-9]|10)$ ]] || { echo "Invalid account slot: $slot" >&2; exit 2; }
+[[ "$startup_enabled" =~ ^[01]$ ]] || { echo "Invalid startup_enabled flag (must be 0 or 1)" >&2; exit 2; }
+[[ "$startup_delay" =~ ^[0-9]+$ ]] && (( startup_delay >= 0 && startup_delay <= 60 )) || { echo "Invalid startup delay (must be 0-60s)" >&2; exit 2; }
+[[ "$tpa_auto_accept" =~ ^[01]$ ]] || { echo "Invalid tpa_auto_accept flag (must be 0 or 1)" >&2; exit 2; }
+
+if [[ "$startup_command" =~ [[:cntrl:]] ]]; then
+  echo "Startup command cannot contain control characters" >&2
+  exit 2
+fi
+if [[ ${#startup_command} -gt 100 ]]; then
+  echo "Startup command cannot exceed 100 characters" >&2
+  exit 2
+fi
+if [[ "$tpa_whitelist" =~ [[:cntrl:]] ]]; then
+  echo "TPA whitelist cannot contain control characters" >&2
+  exit 2
+fi
+if [[ ${#tpa_whitelist} -gt 500 ]]; then
+  echo "TPA whitelist cannot exceed 500 characters" >&2
+  exit 2
+fi
+if [[ "$tpa_auto_accept" == "1" && -z "${tpa_whitelist//[[:space:]]/}" ]]; then
+  echo "TPA auto-accept requires a non-empty whitelist" >&2
+  exit 2
+fi
+if [[ "$purpose" =~ [[:cntrl:]] ]]; then
+  echo "Purpose cannot contain control characters" >&2
+  exit 2
+fi
+if [[ ${#purpose} -gt 32 ]]; then
+  echo "Purpose cannot exceed 32 characters" >&2
+  exit 2
+fi
+
+startup_command="${startup_command#"${startup_command%%[![:space:]]*}"}"
+startup_command="${startup_command%"${startup_command##*[![:space:]]}"}"
+if [[ -n "$startup_command" && "$startup_command" != /* ]]; then
+  startup_command="/$startup_command"
+fi
+if [[ -z "$startup_command" ]]; then
+  startup_command="/home alt"
+fi
+
+purpose="${purpose#"${purpose%%[![:space:]]*}"}"
+purpose="${purpose%"${purpose##*[![:space:]]}"}"
+
+enabled_bool=false
+[[ "$startup_enabled" == 1 ]] && enabled_bool=true
+tpa_bool=false
+[[ "$tpa_auto_accept" == 1 ]] && tpa_bool=true
+
+slot_dir="/home/mc/slots/${slot}"
+mkdir -p "$slot_dir"
+
+tmp="$(mktemp "$slot_dir/settings.json.XXXXXX" 2>/dev/null || mktemp)"
+jq -n \
+  --argjson enabled "$enabled_bool" \
+  --arg cmd "$startup_command" \
+  --argjson delay "$startup_delay" \
+  --argjson tpa "$tpa_bool" \
+  --arg wl "$tpa_whitelist" \
+  --arg purpose "$purpose" \
+  '{
+    startup_command_enabled: $enabled,
+    startup_command: $cmd,
+    startup_delay: $delay,
+    tpa_auto_accept: $tpa,
+    tpa_whitelist: $wl,
+    purpose: $purpose
+  }' > "$tmp"
+
+mv "$tmp" "$slot_dir/settings.json"
+chown -R mc:mc "$slot_dir" 2>/dev/null || true
+chmod 640 "$slot_dir/settings.json" 2>/dev/null || true
+
+# Re-prepare MCC config and startup script for this slot if helper is present
+if command -v alt-pilot-mcc-prepare >/dev/null 2>&1; then
+  if [[ "$(id -un)" == mc ]]; then
+    alt-pilot-mcc-prepare "$slot"
+  elif command -v sudo >/dev/null 2>&1; then
+    sudo -n -u mc /usr/local/bin/alt-pilot-mcc-prepare "$slot" 2>/dev/null || true
+  fi
+fi
+
+# Hot-reload running client so matches.ini / whitelist changes take effect immediately without restarting
+if [[ "$slot" == 1 ]]; then
+  unit=alt-pilot.service
+else
+  unit="alt-pilot@${slot}.service"
+fi
+
+fifo="$slot_dir/control.fifo"
+fifo_owner="$(stat -c '%U:%G' "$fifo" 2>/dev/null || true)"
+fifo_mode="$(stat -c '%a' "$fifo" 2>/dev/null || true)"
+if [[ "$(systemctl is-active "$unit" 2>/dev/null || true)" == active ]] \
+  && [[ -p "$fifo" && ! -L "$fifo" ]] \
+  && [[ "$fifo_mode" == 600 ]] \
+  && { ! id -u mc >/dev/null 2>&1 || [[ "$fifo_owner" == mc:mc ]]; }; then
+  timeout 3 tee "$fifo" >/dev/null <<<'\reload' 2>/dev/null || true
+fi
+
+echo "Account $slot settings saved."

@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
+      - name: Install locked Bedrock dependencies
+        working-directory: bedrock
+        run: npm ci --no-audit --no-fund
+      - name: Unit tests
+        run: python3 -m unittest discover -s tests -v
+      - name: JavaScript and private-server regression tests
+        run: node --test tests/*.test.js bedrock/*.test.js
+      - name: Syntax checks
+        run: |
+          python3 -m py_compile control_center.py remote_control.py mc_server_ping.py
+          node --check web/app.js
+          node --check web/console-format.js
+          while IFS= read -r script; do bash -n "$script"; done < <(find . -type f -name '*.sh' -print)

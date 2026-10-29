@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Print the Minecraft profile name that belongs to one MCC session cache.
+#
+# MCC stores the cache as MessagePack. The Minecraft services token inside it
+# carries the profile ("pfd") of the account that signed in, so it is the only
+# per-slot source that cannot be confused with another account's saved profile.
+set -Eeuo pipefail
+
+cache="${1:-}"
+[[ -n "$cache" && -s "$cache" ]] || exit 0
+
+token="$(grep -aoE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+' "$cache" | head -1 || true)"
+[[ -n "$token" ]] || exit 0
+
+payload="${token#*.}"
+while (( ${#payload} % 4 )); do payload+='='; done
+name="$(printf '%s' "$payload" | tr -- '-_' '+/' | base64 -d 2>/dev/null \
+  | jq -r 'first(.pfd[]? | select(.type == "mc") | .name) // empty' 2>/dev/null || true)"
+
+# Only a real Minecraft name reaches the dashboard label.
+[[ "$name" =~ ^[A-Za-z0-9_]{3,16}$ ]] || exit 0
+printf '%s\n' "$name"

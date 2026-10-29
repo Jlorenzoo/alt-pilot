@@ -1,0 +1,798 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#18191b">
+  <title>ALT Pilot — 24/7 MC-alts</title>
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="alternate icon" href="/favicon.ico">
+  <link rel="stylesheet" href="/styles.css?v=20261029sharedaccounts1">
+  <link rel="stylesheet" href="/workspace.css?v=20261029sharedaccounts1">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="#overview" aria-label="ALT Pilot home">
+        <img class="brand-mark" src="/icon.svg" width="36" height="36" alt="">
+        <span class="brand-copy">
+          <span class="brand-name">ALT Pilot</span>
+          <span class="brand-tag" data-i18n="brand_tag">Minecraft client control</span>
+        </span>
+      </a>
+
+      <nav aria-label="Main navigation">
+        <button class="nav-item active" data-view="overview" aria-label="Overview" data-i18n-aria="nav_overview">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 13h6V4H4v9Zm0 7h6v-4H4v4Zm10 0h6v-9h-6v9Zm0-16v4h6V4h-6Z"/></svg>
+          <span class="nav-label" data-i18n="nav_overview">Overview</span>
+        </button>
+        <button class="nav-item" data-view="availability" aria-label="Availability" data-i18n-aria="nav_availability">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h2v16h16v2H3V3Zm4 10h3v4H7v-4Zm5-6h3v10h-3V7Zm5 3h3v7h-3v-7Z"/></svg>
+          <span class="nav-label" data-i18n="nav_availability">Availability</span>
+        </button>
+        <button class="nav-item" data-view="setup" aria-label="Account setup" data-i18n-aria="nav_setup">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 4.5 6.2v8.6L12 19l7.5-4.2V6.2L12 2Zm0 2.3 5 2.8-5 2.8-5-2.8 5-2.8ZM6.5 8.8l4.5 2.5v5.1l-4.5-2.5V8.8Zm6.5 7.6v-5.1l4.5-2.5v5.1L13 16.4Z"/></svg>
+          <span class="nav-label" data-i18n="nav_setup">Account setup</span>
+        </button>
+        <button class="nav-item" data-view="settings" aria-label="Settings" data-i18n-aria="nav_settings">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.4 7.4 0 0 0 .1-1 7.4 7.4 0 0 0-.1-1l2-1.6-2-3.5-2.5 1a7.8 7.8 0 0 0-1.7-1L14.8 3h-4l-.4 2.7a7.8 7.8 0 0 0-1.7 1l-2.5-1-2 3.5 2 1.7a7.4 7.4 0 0 0-.1 1 7.4 7.4 0 0 0 .1 1l-2 1.6 2 3.5 2.5-1a7.8 7.8 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.8 7.8 0 0 0 1.7-1l2.5 1 2-3.5-2-1.6ZM12.8 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"/></svg>
+          <span class="nav-label" data-i18n="nav_settings">Settings</span>
+        </button>
+        <button class="nav-item" data-view="calculator" aria-label="Calculator" data-i18n-aria="nav_calculator">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2Zm0 2v4h10V4H7Zm0 6v2h2v-2H7Zm4 0v2h2v-2h-2Zm4 0v2h2v-2h-2Zm-8 4v2h2v-2H7Zm4 0v2h2v-2h-2Zm4 0v2h2v-2h-2Zm-8 4v2h2v-2H7Zm4 0v2h2v-2h-2Zm4 0v2h2v-2h-2Z"/></svg>
+          <span class="nav-label" data-i18n="nav_calculator">Calculator</span>
+        </button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="lang-switcher" id="langSwitcher" role="radiogroup" aria-label="Language selection">
+          <div class="lang-switcher-title">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12.87 15.07l-2.54-2.51.03-.08A13.88 13.88 0 0 0 14.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
+            <span data-i18n="lang_label">Language</span>
+          </div>
+          <div class="lang-segmented">
+            <button type="button" class="lang-btn active" data-lang="en" role="radio" aria-checked="true">English</button>
+            <button type="button" class="lang-btn" data-lang="it" role="radio" aria-checked="false">Italiano</button>
+          </div>
+        </div>
+        <div class="sidebar-foot-meta">
+          <div class="security-note">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 5 5v6c0 4.6 3 8.9 7 10 4-1.1 7-5.4 7-10V5l-7-3Zm0 2.2 5 2.1V11c0 3.5-2.1 6.8-5 7.8-2.9-1-5-4.3-5-7.8V6.3l5-2.1Zm-1 4.3v5l4-2.5-4-2.5Z"/></svg>
+            <span data-i18n="sidebar_security_note">Sessions run on cloud VMs</span>
+          </div>
+          <button type="button" class="sidebar-subtle-btn" data-view="voting" title="Voting" aria-label="Voting" data-i18n-title="nav_voting" data-i18n-aria="nav_voting">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 16.17 7.79-7.79-1.41-1.42L9 13.34 6.62 10.96l-1.41 1.41L9 16.17Zm3-14.17c5.52 0 10 4.48 10 10s-4.48 10-10 10S2 17.52 2 12 6.48 2 12 2Z"/></svg>
+          </button>
+        </div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div class="mobile-brand">
+          <img class="brand-mark" src="/icon.svg" width="36" height="36" alt="">
+          <span class="brand-copy">
+            <span class="brand-name">ALT Pilot</span>
+            <span class="brand-tag" data-i18n="brand_tag">Minecraft client control</span>
+          </span>
+        </div>
+
+        <div class="topbar-title">
+          <p class="eyebrow" id="topbarEyebrow" data-i18n="topbar_overview">Complex Gaming · Java &amp; Bedrock</p>
+        </div>
+
+        <div class="topbar-center">
+          <nav class="settings-tabs hidden" id="settingsTabs" role="tablist" aria-label="Settings sections">
+            <button type="button" class="settings-tab active" role="tab" data-tab="game" aria-selected="true" aria-controls="settings-game" data-i18n="tab_game">Client</button>
+            <button type="button" class="settings-tab" role="tab" data-tab="account" aria-selected="false" aria-controls="settings-account" data-i18n="tab_account">Account</button>
+            <button type="button" class="settings-tab" role="tab" data-tab="performance" aria-selected="false" aria-controls="settings-performance" data-i18n="tab_performance">Resources</button>
+            <button type="button" class="settings-tab" role="tab" data-tab="remote" aria-selected="false" aria-controls="settings-remote" data-i18n="tab_remote">Remote access</button>
+          </nav>
+          <div class="topbar-chips">
+          <div class="rate-chip hidden" id="rateChip" title="Current IGM / GC rate">
+            <span class="rate-chip-label">Rate</span>
+            <span class="rate-chip-value"><strong id="rateChipValue">—</strong> <small>IGM / GC</small></span>
+            <button type="button" class="rate-chip-edit" id="rateChipEdit" aria-label="Edit rate" title="Edit rate">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25Zm17.71-10.04a1 1 0 0 0 0-1.41l-2.5-2.5a1 1 0 0 0-1.42 0l-1.83 1.83 3.75 3.75 2-2.67Z"/></svg>
+            </button>
+            <div class="rate-chip-popover hidden" id="rateChipPopover" role="dialog" aria-label="Edit rate">
+              <label>
+                <span>IGM per 1 GC</span>
+                <input id="calcRate" type="text" inputmode="decimal" placeholder="2M" autocomplete="off">
+              </label>
+              <div class="rate-presets" id="calcPresets">
+                <button type="button" class="rate-preset" data-preset="2000000">2M</button>
+                <button type="button" class="rate-preset" data-preset="3000000">3M</button>
+                <button type="button" class="rate-preset" data-preset="5000000">5M</button>
+              </div>
+              <small class="rate-chip-saved" id="calcRateSaved">Saved</small>
+            </div>
+          </div>
+          <div class="fee-chip hidden" id="feeChip">
+            <span class="fee-chip-label" data-i18n="calc_fee_label">AH fee</span>
+            <div class="calc-fee-toggle" role="radiogroup" aria-label="Auction house fee">
+              <button type="button" class="calc-fee-opt is-active" data-fee="2" role="radio" aria-checked="true">
+                <span class="calc-fee-opt-pct">2%</span>
+              </button>
+              <button type="button" class="calc-fee-opt" data-fee="0" role="radio" aria-checked="false">
+                <span class="calc-fee-opt-pct">0%</span>
+                <span class="calc-fee-opt-sub" data-i18n="calc_fee_sunday">Sunday</span>
+              </button>
+            </div>
+          </div>
+          </div>
+        </div>
+
+        <div class="topbar-actions">
+          <div class="mobile-lang-switcher" id="mobileLangSwitcher" role="radiogroup" aria-label="Language selection">
+            <button type="button" class="lang-btn active" data-lang="en" role="radio" aria-checked="true">EN</button>
+            <button type="button" class="lang-btn" data-lang="it" role="radio" aria-checked="false">IT</button>
+          </div>
+          <div id="topbarPower" class="topbar-power">
+            <button class="icon-button client-power" data-action="start" id="primaryControl" title="Start client" aria-label="Start client" data-i18n-title="topbar_start_client" data-i18n-aria="topbar_start_client">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m8 5 11 7-11 7V5Z"/></svg>
+            </button>
+            <button class="icon-button" data-action="restart" id="restartTop" title="Restart client" aria-label="Restart client" data-i18n-title="topbar_restart_client" data-i18n-aria="topbar_restart_client">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17.7 6.3A8 8 0 1 0 20 12h-2a6 6 0 1 1-1.8-4.3L13 11h8V3l-3.3 3.3Z"/></svg>
+            </button>
+          </div>
+          <a class="icon-button logout-link hidden" id="logoutLink" href="/logout" title="Sign out" aria-label="Sign out" data-i18n-title="topbar_sign_out" data-i18n-aria="topbar_sign_out">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5-5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/></svg>
+          </a>
+        </div>
+        <section id="accountSwitcher" class="account-switcher account-strip hidden" aria-label="Minecraft accounts">
+          <div class="account-strip-heading">
+            <div><span data-i18n="accounts_heading">Accounts</span><span id="accountFleetSummary" class="fleet-summary"></span></div>
+            <div class="account-actions hidden"><button id="setPrimaryAccount" class="button secondary primary-account-button" type="button">Make primary</button><button id="addAccountButton" class="icon-button" type="button" title="Add account" aria-label="Add account" data-i18n-title="topbar_add_account" data-i18n-aria="topbar_add_account"><span aria-hidden="true">+</span></button></div>
+          </div>
+          <div id="accountTabs" class="account-tabs hidden"></div>
+        </section>
+      </header>
+
+      <div class="content">
+        <div id="alertBanner" class="alert hidden" role="status"></div>
+
+        <section id="view-overview" class="view active">
+
+          <section class="hero-status" aria-labelledby="connectionTitle">
+            <div class="hero-main">
+              <div class="hero-copy" role="status" aria-live="polite" aria-atomic="true">
+                <div id="connectionPill" class="state-pill neutral"><span></span><span data-i18n="status_checking">Checking</span></div>
+                <h2 id="connectionTitle" data-i18n="status_reading_vm">Reading the VM</h2>
+                <p id="connectionDescription" data-i18n="status_reading_desc">This usually takes a few seconds.</p>
+              </div>
+            </div>
+            <aside class="connection-presence" aria-label="Selected account connection status">
+              <div class="presence-heading">
+                <span id="statusOrb" class="status-orb" aria-hidden="true">—</span>
+                <div class="presence-meta">
+                  <span class="presence-label" data-i18n="presence_selected_account">Selected account</span>
+                  <div class="presence-account-row">
+                    <strong id="accountValue">—</strong>
+                    <span class="account-summary-badge purpose-badge" id="overviewPurposeBadge">Alt 1</span>
+                    <button type="button" id="overviewAccountSettingsBtn" class="presence-settings-btn" title="Configure this account" aria-label="Configure this account" data-i18n-title="presence_configure_account" data-i18n-aria="presence_configure_account">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19.4 13a7.4 7.4 0 0 0 .1-1 7.4 7.4 0 0 0-.1-1l2-1.6-2-3.5-2.5 1a7.8 7.8 0 0 0-1.7-1L14.8 3h-4l-.4 2.7a7.8 7.8 0 0 0-1.7 1l-2.5-1-2 3.5 2 1.7a7.4 7.4 0 0 0-.1 1 7.4 7.4 0 0 0 .1 1l-2 1.6 2 3.5 2.5-1a7.8 7.8 0 0 0 1.7 1l.4 2.7h4l.4-2.7a7.8 7.8 0 0 0 1.7-1l2.5 1 2-3.5-2-1.6ZM12.8 16a4 4 0 1 1 0-8 4 4 0 0 1 0 8Z"/></svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <p id="connectionDetail" class="presence-detail" data-i18n="presence_checking_detail">Checking the client and VM connection.</p>
+            </aside>
+            <div class="status-metrics">
+              <dl class="connection-details">
+                <div><dt data-i18n="metric_server">Server</dt><dd id="serverValue">—</dd></div>
+                <div><dt data-i18n="metric_version">Version</dt><dd id="versionValue">—</dd></div>
+                <div><dt data-i18n="metric_running_since">Running since</dt><dd id="sinceValue">—</dd></div>
+              </dl>
+              <dl class="resource-metrics" aria-label="VM resources">
+                <div title="Client memory of VM total"><dt data-i18n="metric_memory">Memory</dt><dd><strong id="memoryMetric">—</strong><span> / <small id="memoryLimit">—</small></span></dd></div>
+                <div title="Swap used of total"><dt data-i18n="metric_swap">Swap</dt><dd><strong id="swapMetric">—</strong><span> / <small id="swapLimit">—</small></span></dd></div>
+                <div title="Disk used on the boot volume"><dt data-i18n="metric_disk">Disk used</dt><dd><strong id="diskMetric">—</strong></dd></div>
+              </dl>
+            </div>
+          </section>
+
+          <section class="panel communication-panel" aria-labelledby="communicationTitle">
+              <header class="console-chrome">
+                <div class="console-title-row">
+                  <h3 id="communicationTitle" data-i18n="console_title">Account console</h3><span id="consoleAccountName" class="console-account-name"></span>
+                  <details class="console-help">
+                    <summary aria-label="Console help" title="Console help" data-i18n-aria="console_help_label" data-i18n-title="console_help_label">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-.1-5.5h1.8v1.8h-1.8v-1.8Zm.2-8.2c2 0 3.4 1.1 3.4 2.8 0 1.2-.6 1.9-1.6 2.6-.8.5-1.1.9-1.1 1.7h-1.7c0-1.4.5-2.1 1.6-2.8.7-.5 1.1-.8 1.1-1.5 0-.8-.7-1.3-1.7-1.3-1.1 0-1.8.5-2.4 1.2L8.5 7.9a4.5 4.5 0 0 1 3.6-1.6Z"/></svg>
+                    </summary>
+                    <div class="console-help-popover">
+                      <strong data-i18n="console_help_title">Console help</strong>
+                      <p data-i18n="console_help_lead">Type chat normally. Text beginning with <code>/</code> is sent to the server.</p>
+                      <ul>
+                        <li><code>/help</code><span>Show the server command list</span></li>
+                        <li><code>/tpaccept</code><span>Accept a teleport request</span></li>
+                        <li><code>/tpcancel</code><span>Cancel a teleport request</span></li>
+                        <li><code>/tpa player</code><span>Request a teleport to a player</span></li>
+                        <li><code>/clear</code><span>Clear only this local view</span></li>
+                      </ul>
+                    </div>
+                  </details>
+                </div>
+                <div class="console-toolbar" aria-label="Console message filters">
+                  <div class="console-filters" role="group" aria-label="Console views">
+                    <button type="button" class="console-filter active" data-console-filter="conversation" aria-pressed="true"><span data-i18n="console_filter_conversation">Conversation</span><span class="console-count" data-console-count="conversation">0</span></button>
+                    <button type="button" class="console-filter whisper" data-console-filter="whisper" aria-pressed="false"><span data-i18n="console_filter_whisper">Whispers</span><span class="console-count" data-console-count="whisper">0</span></button>
+                    <button type="button" class="console-filter" data-console-filter="attention" aria-pressed="false"><span data-i18n="console_filter_attention">Issues</span><span class="console-count" data-console-count="attention">0</span></button>
+                    <button type="button" class="console-filter" data-console-filter="all" aria-pressed="false"><span data-i18n="console_filter_all_messages">All messages</span><span class="console-count" data-console-count="all">0</span></button>
+                  </div>
+                  <div class="console-tools">
+                    <select id="consoleSource" aria-label="Console source">
+                      <option value="" data-i18n="console_source">By source</option>
+                      <option value="player" data-i18n="console_filter_player">Chat</option>
+                      <option value="server" data-i18n="console_filter_server">Server</option>
+                      <option value="self" data-i18n="console_filter_self">You</option>
+                      <option value="client" data-i18n="console_filter_client">Client</option>
+                    </select>
+                  <label class="console-search">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M10 4a6 6 0 1 0 3.9 10.6l4.2 4.2 1.4-1.4-4.2-4.2A6 6 0 0 0 10 4Zm0 2a4 4 0 1 1 0 8 4 4 0 0 1 0-8Z"/></svg>
+                    <input id="consoleSearch" type="search" autocomplete="off" data-i18n-placeholder="console_search_placeholder" placeholder="Search messages…" data-i18n-aria="console_search_label" aria-label="Search console messages">
+                  </label>
+                  </div>
+                </div>
+                <div class="console-result-line"><span id="consoleResultSummary" role="status"></span><span data-i18n="console_newest_bottom">Newest at the bottom</span></div>
+              </header>
+              <div id="consoleOutput" class="account-console empty" role="log" aria-live="polite" aria-label="Selected account console">
+                <p class="console-empty" data-i18n="console_empty">Select an account to load its console.</p>
+              </div>
+              <form id="communicationForm" class="communication-form">
+                <label class="communication-input-wrap" for="communicationInput">
+                  <span id="communicationPrefix" aria-hidden="true">›</span>
+                  <input id="communicationInput" maxlength="100" autocomplete="off" placeholder="Chat or /command…" data-i18n-placeholder="console_input_placeholder" aria-label="Chat message or slash command" data-i18n-aria="console_input_aria" aria-describedby="communicationCount" disabled>
+                </label>
+                <span id="communicationCount" class="communication-count">0/100</span>
+                <button id="communicationSend" class="button primary" type="submit" disabled><span data-i18n="console_send_btn">Send</span> <span aria-hidden="true">↵</span></button>
+                <div class="communication-foot">
+                  <p id="communicationHint" role="status" hidden></p>
+                </div>
+              </form>
+            </section>
+
+          <section class="panel item-control-panel" aria-labelledby="itemControlsTitle">
+            <h3 id="itemControlsTitle" data-i18n="item_controls_title">Item controls</h3>
+              <div class="item-control-actions">
+                <button type="button" class="quick-action-btn" id="useItemBtn" title="Right-click / use held item (e.g. throw XP bottle, eat, use)" data-i18n-title="action_use_item_title" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 11.24V7.5a2.5 2.5 0 0 1 5 0v3.74c1.21-.81 2-2.18 2-3.74a4.5 4.5 0 0 0-9 0c0 1.56.79 2.93 2 3.74zm9.84 4.63-4.54-2.26A2.01 2.01 0 0 0 13.4 13.5H13v-6a1 1 0 0 0-2 0v8.14l-3.32-.7a1.47 1.47 0 0 0-1.48.51l-.7.77 4.96 5.25c.57.61 1.37.97 2.21.97h5.83c1.47 0 2.7-1.07 2.91-2.53l.63-4.41a2 2 0 0 0-1.2-2.13z"/></svg>
+                  <span data-i18n="action_use_item">right click</span>
+                </button>
+                <button type="button" class="quick-action-btn" id="dropItemBtn" title="Drop item held in hand to ground" data-i18n-title="action_drop_item_title" disabled>
+                  <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z"/></svg>
+                  <span data-i18n="action_drop_item">Q (drop item)</span>
+                </button>
+                <details class="console-help item-commands-help">
+                  <summary aria-label="Item and chat commands" title="Item and chat commands" data-i18n-aria="item_commands_title" data-i18n-title="item_commands_title">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20Zm0 18a8 8 0 1 1 0-16 8 8 0 0 1 0 16Zm-.1-5.5h1.8v1.8h-1.8v-1.8Zm.2-8.2c2 0 3.4 1.1 3.4 2.8 0 1.2-.6 1.9-1.6 2.6-.8.5-1.1.9-1.1 1.7h-1.7c0-1.4.5-2.1 1.6-2.8.7-.5 1.1-.8 1.1-1.5 0-.8-.7-1.3-1.7-1.3-1.1 0-1.8.5-2.4 1.2L8.5 7.9a4.5 4.5 0 0 1 3.6-1.6Z"/></svg>
+                  </summary>
+                  <div class="console-help-popover">
+                    <strong data-i18n="item_commands_title">Item and chat commands</strong>
+                    <p data-i18n="item_commands_intro">Java and Bedrock. Only players on your existing whitelist can send these commands.</p>
+                    <ul>
+                      <li><code>item use</code><span data-i18n="item_commands_use">Right-click with the held item.</span></li>
+                      <li><code>item drop</code><span data-i18n="item_commands_drop">Drop one held item.</span></li>
+                      <li><code>xp</code> / <code>xp?</code><span data-i18n="item_commands_xp">Reply privately with sidebar XP, or an estimate from level and progress.</span></li>
+                      <li><code>help</code><span data-i18n="item_commands_help">Reply privately with this command list.</span></li>
+                      <li><code>whitelist add NAME</code><span data-i18n="item_commands_add">Allow a player on all accounts.</span></li>
+                      <li><code>whitelist remove NAME</code><span data-i18n="item_commands_remove">Remove a player from all accounts.</span></li>
+                      <li><code>restart</code><span data-i18n="item_commands_restart">Restart only the account receiving the command.</span></li>
+                    </ul>
+                    <p data-i18n="item_commands_scope">Whisper to one alt to target it. Public chat reaches every listening alt. Item actions have a 2-second cooldown.</p>
+                  </div>
+                </details>
+              </div>
+          </section>
+        </section>
+
+        <section id="view-availability" class="view">
+          <div class="page-heading"><div><p class="section-kicker">Connection history</p><h1>Availability</h1><p>Connection history for the selected account.</p></div></div>
+          <div class="availability-toolbar">
+            <label>Period<select id="availabilityPeriod"><option value="1">Last 24 hours</option><option value="7">Last 7 days</option><option value="30">Last 30 days</option></select></label>
+            <button type="button" class="button secondary" id="availabilityRefresh">Refresh</button>
+          </div>
+          <p id="availabilityNotice" role="status">Loading connection history…</p>
+          <div id="availabilityReport"></div>
+        </section>
+
+        <section id="view-setup" class="view">
+          <div class="wizard-layout">
+            <ol class="steps" id="setupSteps">
+              <li data-step="local"><span>1</span><div><strong data-i18n="setup_step_1_title">This computer</strong><small data-i18n="setup_step_1_sub">Required tools and SSH key</small></div></li>
+              <li data-step="cloud"><span>2</span><div><strong data-i18n="setup_step_2_title">Oracle account</strong><small data-i18n="setup_step_2_sub">Sign-in, region and free allowance</small></div></li>
+              <li data-step="vm"><span>3</span><div><strong data-i18n="setup_step_3_title">Always Free VM</strong><small data-i18n="setup_step_3_sub">E2.1.Micro and storage guard</small></div></li>
+              <li data-step="install"><span>4</span><div><strong data-i18n="setup_step_4_title">Secure install</strong><small data-i18n="setup_step_4_sub">Lightweight MCC and services</small></div></li>
+              <li data-step="auth"><span>5</span><div><strong data-i18n="setup_step_5_title">This account</strong><small data-i18n="setup_step_5_sub">Microsoft sign-in for the selected account</small></div></li>
+            </ol>
+
+            <section class="wizard-card">
+              <div class="wizard-progress"><span id="wizardProgressBar"></span></div>
+              <div id="wizardContent"></div>
+            </section>
+          </div>
+        </section>
+
+        <section id="view-voting" class="view">
+          <div class="voting-layout">
+            <header class="voting-intro">
+              <div class="voting-intro-copy">
+                <p class="eyebrow" data-i18n="voting_eyebrow">Server rewards</p>
+                <h1 data-i18n="voting_title">Voting</h1>
+                <p data-i18n="voting_lead">Vote for Complex Gaming across listing websites to receive daily keys, claim blocks, and rewards. Timers update automatically per site.</p>
+              </div>
+              <div class="voting-header-controls">
+                <div class="voting-alert-toggles">
+                  <button type="button" class="voting-alert-btn" id="votingNotifyBtn" title="Enable browser notifications when a timer expires" data-i18n-title="voting_notify_title">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+                    <span id="votingNotifyLabel">Alerts: Off</span>
+                  </button>
+                  <button type="button" class="voting-alert-btn active" id="votingSoundBtn" title="Toggle audio chime alert" data-i18n-title="voting_sound_title">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/></svg>
+                    <span id="votingSoundLabel">Sound: On</span>
+                  </button>
+                  <button type="button" class="text-button" id="votingTestAlertBtn" title="Test notification and chime" data-i18n="voting_test_btn">Test</button>
+                </div>
+              </div>
+            </header>
+
+            <div id="votingNotice" class="alert hidden" role="status"></div>
+
+            <div class="voting-grid" id="votingGrid">
+              <!-- Jlorenzoo Section -->
+              <section class="panel voting-section" data-player-section="jeremy">
+                <div class="voting-section-header">
+                  <div class="voting-player-profile">
+                    <span class="account-avatar voting-avatar">
+                      <img id="jeremyAvatarImg" src="https://mc-heads.net/avatar/Jlorenzoo/34.png" alt="Jlorenzoo" loading="lazy">
+                    </span>
+                    <div class="voting-player-meta">
+                      <h2>Jlorenzoo</h2>
+                      <span class="voting-count-badge" id="jeremyVoteBadge">0/8 ready</span>
+                    </div>
+                  </div>
+                  <div class="voting-section-actions">
+                    <button type="button" class="voting-icon-toggle active" id="jeremyAlertToggleBtn" data-toggle-player-alert="jeremy" title="Toggle alerts for Jlorenzoo (Currently On)">
+                      <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6v-5c0-3.07-1.63-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.64 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2zm-2 1H8v-6c0-2.48 1.51-4.5 4-4.5s4 2.02 4 4.5v6z"/></svg>
+                    </button>
+                    <div class="voting-batch-pill" role="group" aria-label="Batch actions for Jlorenzoo">
+                      <button type="button" class="voting-batch-btn action-mark" data-batch-action="mark_all" data-player="jeremy" title="Mark all 8 as voted now" data-i18n-title="voting_mark_all_title">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M9 16.17 4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41L9 16.17z"/></svg>
+                        <span data-i18n="voting_mark_all">Mark all</span>
+                      </button>
+                      <button type="button" class="voting-batch-btn" data-batch-action="set_vote_time" data-player="jeremy" title="Set vote time for all (e.g. 06:09)" data-i18n-title="voting_set_time_title">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg>
+                      </button>
+                      <button type="button" class="voting-batch-btn" data-batch-action="reset_all" data-player="jeremy" title="Reset all 8 timers to ready" data-i18n-title="voting_reset_all_title">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.65 6.35A7.958 7.958 0 0 0 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08A5.99 5.99 0 0 1 12 18c-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div class="voting-cards" id="votingCardsJeremy"></div>
+              </section>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-calculator" class="view">
+          <header class="settings-intro calc-intro">
+            <p class="eyebrow" data-i18n="calc_eyebrow">Trading tools</p>
+            <h1 data-i18n="calc_title">IGM ↔ GC profit calculator</h1>
+            <p class="calc-lead" data-i18n="calc_lead">Enter what you pay and what you receive. Profit is shown per 64-item stack.</p>
+          </header>
+
+          <div class="calc-panel">
+            <div class="calc-fields">
+              <fieldset class="calc-side calc-side-buy">
+                <legend class="calc-side-title" data-i18n="calc_buy_title">You buy</legend>
+                <div class="calc-row">
+                  <div class="calc-input-wrap">
+                    <input id="calcBuyAmount" type="text" inputmode="decimal" placeholder="215K" autocomplete="off">
+                  </div>
+                  <button type="button" class="calc-cur-toggle calc-buy-currency-label" id="calcBuyCurToggle" title="Switch currency">IGM</button>
+                </div>
+                <div class="calc-segments" role="radiogroup" aria-label="Buy price batch">
+                  <label class="calc-segment">
+                    <input type="radio" name="calcBuyUnit" value="1" checked>
+                    <span>1×</span>
+                  </label>
+                  <label class="calc-segment">
+                    <input type="radio" name="calcBuyUnit" value="16">
+                    <span>16×</span>
+                  </label>
+                  <label class="calc-segment">
+                    <input type="radio" name="calcBuyUnit" value="64">
+                    <span>64×</span>
+                  </label>
+                  <label class="calc-segment calc-segment-custom">
+                    <input type="radio" name="calcBuyUnit" value="custom">
+                    <span data-i18n="calc_unit_custom">Custom</span>
+                    <input id="calcBuyCustom" type="number" min="1" step="1" inputmode="numeric" value="1" class="calc-custom-input" aria-label="Custom batch size">
+                  </label>
+                </div>
+                <select id="calcBuyCurrency" class="calc-currency-select calc-hidden-select" aria-label="Buy currency" hidden>
+                  <option value="IGM">IGM</option>
+                  <option value="GC">GC</option>
+                </select>
+              </fieldset>
+
+              <fieldset class="calc-side calc-side-sell">
+                <legend class="calc-side-title" data-i18n="calc_sell_title">You sell</legend>
+                <div class="calc-row">
+                  <div class="calc-input-wrap">
+                    <input id="calcSellAmount" type="text" inputmode="decimal" placeholder="9" autocomplete="off">
+                  </div>
+                  <button type="button" class="calc-cur-toggle calc-sell-currency-label" id="calcSellCurToggle" title="Switch currency">GC</button>
+                </div>
+                <div class="calc-segments" role="radiogroup" aria-label="Sell price batch">
+                  <label class="calc-segment">
+                    <input type="radio" name="calcSellUnit" value="1">
+                    <span>1×</span>
+                  </label>
+                  <label class="calc-segment">
+                    <input type="radio" name="calcSellUnit" value="16">
+                    <span>16×</span>
+                  </label>
+                  <label class="calc-segment">
+                    <input type="radio" name="calcSellUnit" value="64" checked>
+                    <span>64×</span>
+                  </label>
+                  <label class="calc-segment calc-segment-custom">
+                    <input type="radio" name="calcSellUnit" value="custom">
+                    <span data-i18n="calc_unit_custom">Custom</span>
+                    <input id="calcSellCustom" type="number" min="1" step="1" inputmode="numeric" value="1" class="calc-custom-input" aria-label="Custom batch size">
+                  </label>
+                </div>
+                <select id="calcSellCurrency" class="calc-currency-select calc-hidden-select" aria-label="Sell currency" hidden>
+                  <option value="GC" selected>GC</option>
+                  <option value="IGM">IGM</option>
+                </select>
+              </fieldset>
+            </div>
+
+            <div class="calc-result" id="calcResult" aria-live="polite"></div>
+          </div>
+
+          <div class="calc-presets-block">
+            <div class="calc-presets-head">
+              <span class="calc-field-label" data-i18n="calc_item_presets">Item presets</span>
+              <button type="button" class="calc-preset-save" id="calcPresetSave" data-i18n="calc_preset_save">+ Save current</button>
+            </div>
+            <div class="calc-item-presets" id="calcItemPresets"></div>
+          </div>
+
+          <div class="calc-dialog-backdrop hidden" id="calcPresetDialog" role="dialog" aria-modal="true" aria-labelledby="calcPresetDialogTitle">
+            <div class="calc-dialog">
+              <h3 id="calcPresetDialogTitle" data-i18n="calc_preset_dialog_title">Save preset</h3>
+              <label class="calc-dialog-label">
+                <span data-i18n="calc_preset_dialog_name">Name</span>
+                <input id="calcPresetName" type="text" maxlength="32" autocomplete="off" placeholder="Votekeys">
+              </label>
+              <span class="calc-dialog-label-text" data-i18n="calc_preset_dialog_icon">Item sprite</span>
+              <input id="calcSpriteSearch" class="calc-sprite-search" type="search" autocomplete="off" placeholder="Search items…" data-i18n-placeholder="calc_sprite_search">
+              <div class="calc-sprite-grid" id="calcSpriteGrid" role="radiogroup" aria-label="Item sprite"></div>
+              <div class="calc-sprite-selected" id="calcSpriteSelected" aria-live="polite"></div>
+              <div class="calc-dialog-actions">
+                <button type="button" class="calc-dialog-btn" id="calcPresetCancel" data-i18n="calc_preset_dialog_cancel">Cancel</button>
+                <button type="button" class="calc-dialog-btn primary" id="calcPresetConfirm" data-i18n="calc_preset_dialog_save">Save</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-settings" class="view">
+          <form id="settingsForm" class="settings-layout">
+            <header class="settings-intro">
+              <h1 data-i18n="settings_heading">Settings</h1>
+              <p data-i18n="settings_lead">Choose an area below. Changes to the Minecraft client take effect after its next restart.</p>
+            </header>
+            <div class="settings-workspace">
+              <div class="settings-panels">
+                <section id="settings-game" class="panel form-panel" data-tab-panel="game" role="tabpanel">
+                  <div class="panel-heading"><div><p class="section-kicker" data-i18n="settings_kicker_client">Minecraft client</p><h3 data-i18n="settings_h3_connection">Connection details</h3><p data-i18n="settings_connection_sub">Use the Java server address and the exact Minecraft version it supports.</p></div></div>
+                  <div class="field-row">
+                    <label><span data-i18n="settings_server_label">Minecraft server</span><input id="serverInput" name="minecraft_server" autocomplete="off" placeholder="play.example.net or play.example.net:25565" required><small data-i18n="settings_server_small">Use the server's direct Java address. A port is optional.</small></label>
+                    <label><span data-i18n="settings_version_label">Minecraft version</span><input id="versionInput" name="minecraft_version" autocomplete="off" required><small data-i18n="settings_version_small">1.12.2 uses little memory, but the selected version must support a real connection.</small></label>
+                  </div>
+                </section>
+                <section id="settings-account" class="panel form-panel hidden" data-tab-panel="account" role="tabpanel">
+                  <div class="panel-heading"><div><p class="section-kicker" data-i18n="settings_kicker_account">Per-Account Configuration</p><h3 data-i18n="settings_h3_account">Account settings</h3><p data-i18n="settings_account_sub">Customize startup automation and behavior for each signed-in Minecraft account.</p></div></div>
+
+                  <div class="account-card-summary" id="accountSummaryBox">
+                    <span class="account-avatar account-settings-avatar">
+                      <img id="accountSettingsAvatar" src="https://mc-heads.net/avatar/MHF_Steve/34.png" alt="" loading="lazy">
+                    </span>
+                    <div class="account-summary-meta">
+                      <div class="account-summary-title">
+                        <strong id="accountSettingsName">No account added</strong>
+                        <span class="account-summary-badge hidden" id="accountSettingsSlotBadge"></span>
+                        <span class="account-summary-badge purpose-badge hidden" id="accountSettingsPurposeBadge"></span>
+                      </div>
+                      <span class="account-summary-sub" id="accountSettingsHost" data-i18n="settings_assigned_vm">Assigned to Oracle VM</span>
+                    </div>
+                  </div>
+
+                  <div class="settings-divider" aria-hidden="true"></div>
+
+                  <div class="panel-heading panel-subheading"><div><p class="section-kicker" data-i18n="settings_kicker_alt">Alt Identity</p><h3 data-i18n="settings_h3_purpose">Purpose &amp; Note</h3><p data-i18n="settings_purpose_sub">Assign a role or note to this alt (e.g. Spawner, Cactus, AFK Pool). Automatically updates if you run <code>/sethome &lt;name&gt;</code> in chat/console.</p></div></div>
+                  <label class="account-purpose-label"><span data-i18n="settings_purpose_label">Alt purpose / role tag</span>
+                    <input id="accountPurposeInput" name="purpose" autocomplete="off" placeholder="e.g. Spawner, Cactus, AFK Pool" data-i18n-placeholder="settings_purpose_placeholder" maxlength="32">
+                    <small data-i18n="settings_purpose_small">Displayed as a tag on account tabs. Automatically updates when you run /sethome &lt;name&gt; in console.</small>
+                  </label>
+
+                  <div class="settings-divider" aria-hidden="true"></div>
+
+                  <div class="panel-heading panel-subheading"><div><p class="section-kicker" data-i18n="settings_kicker_startup">Startup Automation</p><h3 data-i18n="settings_h3_join_cmd">Join command</h3><p data-i18n="settings_join_cmd_sub">Automatically execute a command after connecting and spawning into the server.</p></div></div>
+                  <div class="setting-toggle-card">
+                    <label class="toggle-control" for="accountStartupToggle">
+                      <input type="checkbox" id="accountStartupToggle" name="startup_command_enabled" class="toggle-checkbox">
+                      <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+                      <div class="toggle-label-wrap">
+                        <strong data-i18n="settings_auto_run_cmd">Auto-run command on join</strong>
+                        <small data-i18n="settings_auto_run_cmd_sub">Sends a command (like <code>/home alt</code>) whenever this account loads into the server or reconnects.</small>
+                      </div>
+                    </label>
+                  </div>
+
+                  <div id="startupCommandFields" class="startup-fields">
+                    <label><span data-i18n="settings_startup_cmd_label">Startup command</span>
+                      <input id="accountStartupCommand" name="startup_command" autocomplete="off" placeholder="/home alt" maxlength="100">
+                      <small data-i18n="settings_startup_cmd_small">Command sent to the server (e.g. <code>/home alt</code> or <code>/home farm</code>).</small>
+                    </label>
+
+                    <label><span data-i18n="settings_delay_label">Delay after join</span>
+                      <select id="accountStartupDelay" name="startup_delay">
+                        <option value="2" data-i18n="settings_delay_2s">2 seconds</option>
+                        <option value="3" data-i18n="settings_delay_3s">3 seconds</option>
+                        <option value="5" selected data-i18n="settings_delay_5s">5 seconds (recommended)</option>
+                        <option value="8" data-i18n="settings_delay_8s">8 seconds</option>
+                        <option value="10" data-i18n="settings_delay_10s">10 seconds</option>
+                        <option value="15" data-i18n="settings_delay_15s">15 seconds</option>
+                        <option value="20" data-i18n="settings_delay_20s">20 seconds</option>
+                      </select>
+                      <small data-i18n="settings_delay_small">Gives the server time to finish loading chunks and spawning before running the command.</small>
+                    </label>
+                  </div>
+
+                  <div class="settings-divider" aria-hidden="true"></div>
+
+                  <div class="panel-heading panel-subheading"><div><p class="section-kicker" data-i18n="settings_kicker_tpa">Teleport Automation</p><h3 data-i18n="settings_h3_tpa">Auto-accept teleport requests</h3><p data-i18n="settings_tpa_sub">Automatically accept /tpa and /tpahere requests from trusted players.</p></div></div>
+                  <div class="setting-toggle-card">
+                    <label class="toggle-control" for="accountTpaToggle">
+                      <input type="checkbox" id="accountTpaToggle" name="tpa_auto_accept" class="toggle-checkbox">
+                      <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+                      <div class="toggle-label-wrap">
+                        <strong data-i18n="settings_tpa_auto_accept">Auto-accept /tpa and /tpahere from whitelist</strong>
+                        <small data-i18n="settings_tpa_auto_accept_sub">Automatically runs <code>/tpyes</code> when a whitelisted player requests either direction of teleport.</small>
+                      </div>
+                    </label>
+                  </div>
+
+                  <input type="hidden" id="accountTpaWhitelist" name="tpa_whitelist">
+
+                  <div id="tpaWhitelistContainer" class="whitelist-container">
+                    <div class="whitelist-header">
+                      <span class="whitelist-label" data-i18n="settings_whitelisted_players">Whitelisted players</span>
+                      <span class="whitelist-count" id="tpaWhitelistCount">0 players</span>
+                    </div>
+
+                    <div id="tpaWhitelistList" class="whitelist-list" role="list"></div>
+
+                    <div class="whitelist-add-row">
+                      <div class="whitelist-add-input-wrap">
+                        <span class="whitelist-add-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                        </span>
+                        <input id="tpaAddInput" type="text" autocomplete="off" placeholder="Add player username…" data-i18n-placeholder="settings_add_player_placeholder" maxlength="16">
+                      </div>
+                      <button type="button" id="tpaAddBtn" class="button secondary whitelist-add-btn" title="Add player to whitelist" aria-label="Add player" data-i18n-title="settings_add_player_btn">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+                        <span data-i18n="settings_add_player_btn">Add</span>
+                      </button>
+                    </div>
+                    <small class="whitelist-help-text" data-i18n="settings_whitelist_help">Press Enter or click Add to append. Click any field above to edit or click × to remove.</small>
+
+                    <div class="whitelist-sync-wrap">
+                      <label class="toggle-control" for="accountTpaSyncAllToggle">
+                        <input type="checkbox" id="accountTpaSyncAllToggle" name="tpa_sync_all" class="toggle-checkbox">
+                        <span class="toggle-track" aria-hidden="true"><span class="toggle-thumb"></span></span>
+                        <div class="toggle-label-wrap">
+                          <strong data-i18n="settings_tpa_sync_all">Apply whitelist to all accounts</strong>
+                          <small data-i18n="settings_tpa_sync_all_sub">Update and reload every bot with this whitelist on save without restarting.</small>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </section>
+                <section id="settings-performance" class="panel form-panel" data-tab-panel="performance" role="tabpanel">
+                  <div class="panel-heading"><div><p class="section-kicker" data-i18n="settings_kicker_resources">Client resources</p><h3 data-i18n="settings_h3_memory">Memory limit</h3><p data-i18n="settings_memory_sub">These limits keep room for Linux, SSH and Java’s native memory on the 1 GB VM.</p></div></div>
+                  <div class="field-row">
+                    <label><span data-i18n="settings_min_heap">Minimum heap</span><select id="heapMinInput" name="heap_min"><option>128m</option><option>160m</option><option>192m</option><option>224m</option><option>256m</option><option>320m</option><option>384m</option></select><small data-i18n="settings_min_heap_small">Memory reserved when the client starts.</small></label>
+                    <label><span data-i18n="settings_max_heap">Maximum heap</span><select id="heapMaxInput" name="heap_max"><option>256m</option><option>320m</option><option>384m</option><option>448m</option><option>512m</option></select><small data-i18n="settings_max_heap_small">Hard ceiling for the Minecraft client.</small></label>
+                  </div>
+                  <div class="settings-divider" aria-hidden="true"></div>
+                  <div class="panel-heading panel-subheading"><div><p class="section-kicker" data-i18n="settings_kicker_vm">Oracle VM</p><h3 data-i18n="settings_h3_ssh">Remote shell</h3><p data-i18n="settings_ssh_sub">Login name used by the install and repair tools on the selected host.</p></div></div>
+                  <label><span data-i18n="settings_ssh_user">SSH user</span><input id="sshUserInput" name="ssh_user" autocomplete="off" required></label>
+                </section>
+                <section id="settings-remote" class="settings-remote" data-tab-panel="remote" role="tabpanel">
+                  <section id="remoteAccessPanel" class="panel remote-access-panel hidden">
+                    <div class="panel-heading"><div><p class="section-kicker" data-i18n="settings_kicker_remote">Other devices</p><h3 data-i18n="settings_h3_public_link">Public control link</h3><p data-i18n="settings_public_link_sub">Password-protected HTTPS access from another computer or your phone.</p></div></div>
+                    <div class="remote-access-body"><div><span data-i18n="settings_public_url">Public URL</span><strong id="remoteUrlValue">—</strong><small id="remoteUrlHint"></small></div><a id="remoteUrlLink" class="button secondary remote-open-button" target="_blank" rel="noreferrer"><span data-i18n="settings_open_remote">Open remote control ↗</span></a></div>
+                  </section>
+                  <section id="passwordPanel" class="panel form-panel remote-access-panel hidden">
+                    <div class="panel-heading"><div><p class="section-kicker" data-i18n="settings_kicker_security">Security</p><h3 data-i18n="settings_h3_password">Control password</h3><p data-i18n="settings_password_sub">Set the password used by this public control page.</p></div></div>
+                    <div class="field-row">
+                      <label><span data-i18n="settings_new_password">New password</span><input id="newPasswordInput" type="password" autocomplete="new-password" minlength="12" maxlength="128"><small data-i18n="settings_password_min_chars">Use at least 12 characters.</small></label>
+                      <label><span data-i18n="settings_confirm_password">Confirm password</span><input id="confirmPasswordInput" type="password" autocomplete="new-password" minlength="12" maxlength="128"></label>
+                    </div>
+                    <div class="password-actions"><p id="passwordMessage" data-i18n="settings_password_msg_default">Existing signed-in sessions stay active.</p><button id="changePasswordButton" class="button secondary" type="button" data-i18n="settings_change_password_btn">Change password</button></div>
+                  </section>
+                  <div id="remoteUnavailable" class="settings-empty hidden"><strong data-i18n="settings_remote_unavailable_title">Remote access is not set up</strong><p data-i18n="settings_remote_unavailable_desc">Complete the secure install in Account setup to create a public control link.</p></div>
+                </section>
+                <div class="form-actions" id="settingsSaveActions"><p id="settingsMessage" data-i18n="settings_save_msg">Changes take effect after the next client restart.</p><button class="button primary" id="settingsSaveBtn" type="button" data-i18n="settings_save_btn">Save</button></div>
+              </div>
+            </div>
+          </form>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div id="authModal" class="auth-modal hidden" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+    <div class="auth-modal-card" tabindex="-1">
+      <div class="auth-modal-heading">
+        <span class="microsoft-mark" aria-hidden="true"><i></i><i></i><i></i><i></i></span>
+        <div><p class="eyebrow" data-i18n="auth_eyebrow">Secure device sign-in</p><h2 id="authModalTitle" data-i18n="auth_title">Connect a Microsoft account</h2></div>
+        <button type="button" id="authModalClose" class="auth-modal-close" aria-label="Close sign-in dialog" data-i18n-aria="auth_close_label">×</button>
+      </div>
+      <!-- Stage 1: Choose Edition -->
+      <div id="authEditionStage">
+        <p class="auth-modal-lead" data-i18n="auth_lead">Choose Java, Bedrock, or both for the same Microsoft account:</p>
+        <div class="auth-edition-grid">
+          <button type="button" class="auth-edition-card" data-auth-edition="java">
+            <div class="auth-edition-header">
+              <span class="auth-edition-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+              </span>
+              <span class="auth-edition-badge" data-i18n="auth_card_java_badge">PC Standard</span>
+            </div>
+            <strong data-i18n="auth_card_java_title">Java Edition</strong>
+            <small data-i18n="auth_card_java_desc">Standard PC accounts &amp; Java alts</small>
+          </button>
+
+          <button type="button" class="auth-edition-card" data-auth-edition="bedrock">
+            <div class="auth-edition-header">
+              <span class="auth-edition-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="4"/><circle cx="7.5" cy="12" r="1.5" fill="currentColor"/><circle cx="16.5" cy="10" r="1" fill="currentColor"/><circle cx="18.5" cy="12" r="1" fill="currentColor"/><circle cx="14.5" cy="12" r="1" fill="currentColor"/><circle cx="16.5" cy="14" r="1" fill="currentColor"/></svg>
+              </span>
+              <span class="auth-edition-badge bedrock" data-i18n="auth_card_bedrock_badge">Xbox / Mobile</span>
+            </div>
+            <strong data-i18n="auth_card_bedrock_title">Bedrock Edition</strong>
+            <small data-i18n="auth_card_bedrock_desc">Console, Xbox, or names with a dot prefix (e.g. <code>.username</code>)</small>
+          </button>
+
+          <button type="button" class="auth-edition-card both" data-auth-edition="both">
+            <div class="auth-edition-header">
+              <span class="auth-edition-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="8" height="16" rx="1"/><rect x="13" y="4" width="8" height="16" rx="1"/></svg>
+              </span>
+              <span class="auth-edition-badge both" data-i18n="auth_card_both_badge">Same Microsoft account</span>
+            </div>
+            <strong data-i18n="auth_card_both_title">Java + Bedrock</strong>
+            <small data-i18n="auth_card_both_desc">Verifies Java, then adds Bedrock. An already-saved Java account is reused; nothing needs to be removed.</small>
+          </button>
+        </div>
+        <div class="auth-edition-hint">
+          <span class="auth-hint-icon" aria-hidden="true">💡</span>
+          <span><strong data-i18n="auth_hint_q">Which one should I choose?</strong> <span data-i18n="auth_hint_text">Use Java + Bedrock for both identities from one Microsoft account. If Java is already saved, only the new Bedrock identity is added.</span> <button type="button" id="authGuideLink" class="auth-guide-link" data-i18n="auth_hint_link">How to set up Bedrock →</button></span>
+        </div>
+      </div>
+
+      <!-- Stage 2: Microsoft Device Code Flow -->
+      <div id="authDeviceStage" class="hidden">
+        <div class="auth-active-edition-bar">
+          <span id="authActiveEditionLabel" class="auth-active-label">Connecting Bedrock Edition</span>
+          <button type="button" id="authSwitchEditionBtn" class="auth-switch-link" data-i18n="auth_switch_edition">← Switch edition</button>
+        </div>
+        <ol class="auth-steps">
+          <li><span>1</span><div><strong data-i18n="auth_step1_title">Choose the Microsoft account</strong><small data-i18n="auth_step1_sub">Microsoft asks which account to use before the code.</small></div></li>
+          <li><span>2</span><div><strong data-i18n="auth_step2_title">Confirm the code</strong><small data-i18n="auth_step2_sub">Paste the code below if Microsoft still asks for it.</small></div></li>
+        </ol>
+        <a id="authModalLink" class="auth-modal-link disabled" target="_blank" rel="noopener noreferrer" aria-disabled="true" data-i18n="auth_link_preparing">Preparing sign-in page…</a>
+        <div class="auth-modal-code"><span data-i18n="auth_code_label">One-time code</span><code id="authModalCode">Preparing…</code><button type="button" id="authModalCopy" aria-label="Copy one-time code" disabled data-i18n="auth_copy_btn">Copy</button></div>
+        <div class="auth-modal-status" role="status"><span class="spinner"></span><span id="authModalStatus" data-i18n="auth_status_starting">Starting a secure sign-in session…</span></div>
+        <div id="authSwitchPrompt" class="auth-switch-prompt hidden">
+          <p id="authSwitchPromptText">Java profile not found for this Microsoft account.</p>
+          <button type="button" id="authSwitchPromptBtn" class="button secondary small" data-i18n="auth_switch_java_btn">Try Bedrock Edition instead</button>
+        </div>
+        <p class="auth-modal-foot" data-i18n="auth_foot">You can close this dialog while sign-in continues. We’ll detect approval automatically.</p>
+      </div>
+    </div>
+  </div>
+
+  <div id="bedrockHelpModal" class="auth-modal hidden" role="dialog" aria-modal="true" aria-labelledby="bedrockHelpTitle">
+    <div class="auth-modal-card bedrock-help-card" tabindex="-1">
+      <div class="auth-modal-heading">
+        <span class="auth-edition-icon bedrock-help-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="4"/><circle cx="7.5" cy="12" r="1.5" fill="currentColor"/><circle cx="16.5" cy="10" r="1" fill="currentColor"/><circle cx="18.5" cy="12" r="1" fill="currentColor"/><circle cx="14.5" cy="12" r="1" fill="currentColor"/><circle cx="16.5" cy="14" r="1" fill="currentColor"/></svg>
+        </span>
+        <div><p class="eyebrow" data-i18n="bedrock_help_eyebrow">Bedrock Account Setup</p><h2 id="bedrockHelpTitle" data-i18n="bedrock_help_title">How to Set Up Bedrock</h2></div>
+        <button type="button" id="bedrockHelpClose" class="auth-modal-close" aria-label="Close dialog" data-i18n-aria="auth_close_label">×</button>
+      </div>
+
+      <div class="bedrock-help-body">
+        <div class="bedrock-help-section">
+          <h3 data-i18n="bedrock_help_java_title">Already have a Microsoft Java account?</h3>
+          <p data-i18n="bedrock_help_java_desc">Every Microsoft account that owns Minecraft Java Edition already owns Bedrock Edition for PC at no extra cost (it is included in the official Minecraft bundle).</p>
+          <div class="bedrock-help-callout">
+            <span class="bedrock-help-callout-icon" aria-hidden="true">⚠️</span>
+            <span data-i18n="bedrock_help_launch_warn">Important requirement: You must launch Minecraft Bedrock at least once on this Microsoft account (via the Minecraft Launcher on PC, console, or mobile) before ALT Pilot can authenticate. Opening Bedrock initializes your Xbox player identity and Bedrock multiplayer license with Mojang. Without this one-time launch, sign-in will fail with UNAUTHORIZED.</span>
+          </div>
+        </div>
+
+        <div class="bedrock-help-section">
+          <h3 data-i18n="bedrock_help_alt_title">Setting up a separate Bedrock alt?</h3>
+          <ol class="bedrock-help-steps">
+            <li data-i18n="bedrock_help_alt_step1">Create a free Microsoft account with birth year 18+ (required for online multiplayer without parental locks).</li>
+            <li data-i18n="bedrock_help_alt_step2">Claim your Xbox Gamertag on xbox.com (or in the Minecraft Launcher).</li>
+            <li data-i18n="bedrock_help_alt_step3">Launch Minecraft Bedrock at least once with that account to activate the profile.</li>
+          </ol>
+        </div>
+
+        <div class="bedrock-help-section">
+          <h3 data-i18n="bedrock_help_connect_title">Connecting in ALT Pilot</h3>
+          <p data-i18n="bedrock_help_connect_desc">Choose "Java + Bedrock" to link both identities from one Microsoft account (Java stays active, and Bedrock is added as a companion alt). Or choose "Bedrock Edition" for a standalone alt. Bedrock alts join Floodgate servers like Complex Skyblock with a dot prefix (e.g. .Username).</p>
+        </div>
+      </div>
+
+      <div class="bedrock-help-actions">
+        <button type="button" class="button secondary" id="bedrockHelpDismiss" data-i18n="bedrock_help_close">Got it</button>
+        <button type="button" class="button primary" data-action="go-to-setup" id="bedrockHelpSetupBtn" data-i18n="bedrock_help_cta">Open Account Setup</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="preStartModal" class="pre-start-modal hidden" role="dialog" aria-modal="true" aria-labelledby="preStartTitle">
+    <div class="pre-start-card" tabindex="-1">
+      <div class="pre-start-heading">
+        <span class="pre-start-icon" aria-hidden="true">!</span>
+        <div><p class="eyebrow" data-i18n="pre_start_eyebrow">Heads-up before starting</p><h2 id="preStartTitle" data-i18n="pre_start_title">Another session may be active</h2></div>
+        <button type="button" id="preStartClose" class="auth-modal-close" aria-label="Close warning" data-i18n-aria="pre_start_close_label">×</button>
+      </div>
+      <p id="preStartIntro" class="pre-start-intro">Starting <strong id="preStartName"></strong> can affect another active Minecraft session.</p>
+      <ul id="preStartWarnings" class="pre-start-warnings"></ul>
+      <p class="pre-start-foot" data-i18n="pre_start_foot">If you are sure no one is currently playing on that account, click <strong>Start anyway</strong>. Otherwise, close this dialog and stop the other session first.</p>
+      <div class="pre-start-actions">
+        <button type="button" class="button" id="preStartCancel" data-i18n="pre_start_cancel">Cancel</button>
+        <button type="button" class="button danger" id="preStartConfirm" data-i18n="pre_start_confirm">Start anyway</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="taskDrawer" class="task-drawer" aria-live="polite" aria-hidden="true">
+    <div class="drawer-head"><div><span class="spinner"></span><strong id="taskTitle" data-i18n="task_working">Working…</strong></div><button id="closeDrawer" aria-label="Close">×</button></div>
+    <pre id="taskOutput" data-i18n="task_starting">Starting…</pre>
+  </div>
+
+  <div id="accountContextMenu" class="account-context-menu hidden" role="menu" aria-label="Account options">
+    <div class="account-context-menu-header">
+      <span class="context-menu-account-name" id="contextMenuAccountName">Account</span>
+      <span class="context-menu-account-badge" id="contextMenuAccountBadge">Java</span>
+    </div>
+    <button type="button" class="context-menu-item" data-action="edit" role="menuitem">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>
+      <span data-i18n="account_menu_edit">Edit</span>
+    </button>
+    <button type="button" class="context-menu-item danger" data-action="remove" role="menuitem">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg>
+      <span data-i18n="account_menu_remove">Remove</span>
+    </button>
+  </div>
+
+  <script src="/console-format.js?v=8"></script>
+  <script src="/i18n.js?v=20261026controls2"></script>
+  <script src="/app.js?v=20261029sharedaccounts1"></script>
+  <script src="/availability.js?v=20261029sharedaccounts1"></script>
+</body>
+</html>

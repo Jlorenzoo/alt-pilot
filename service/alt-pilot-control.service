@@ -1,0 +1,37 @@
+[Unit]
+Description=Password-protected ALT Pilot control center
+After=network-online.target alt-pilot.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=afk-control
+Group=afk-control
+WorkingDirectory=/opt/alt-pilot/control
+ExecStart=/usr/bin/python3 /opt/alt-pilot/control/remote_control.py --port 8765
+Restart=on-failure
+RestartSec=5
+UMask=0077
+# The service uses sudo for a small, exact command allowlist in
+# /etc/sudoers.d/alt-pilot-control. No arbitrary command is permitted.
+#
+# systemd 249 implicitly forces NoNewPrivileges=true for several hardening
+# directives (PrivateDevices, ProtectKernelTunables, ProtectKernelModules,
+# ProtectHostname, ProtectClock, LockPersonality, RestrictSUIDSGID,
+# RestrictAddressFamilies). sudo refuses to run when NoNewPrivs is set,
+# so those directives are omitted. The remaining hardenings still keep the
+# service isolated: PrivateTmp, ProtectSystem=strict, ProtectHome=read-only,
+# ReadWritePaths, ProtectControlGroups, and a per-service MemoryMax.
+NoNewPrivileges=false
+# sudo obtains privilege only for its exact allowlist. Ambient SETUID/SETGID
+# would let the web process become root without going through that gateway.
+AmbientCapabilities=
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/etc/alt-pilot /home/mc
+ProtectControlGroups=true
+MemoryMax=80M
+
+[Install]
+WantedBy=multi-user.target

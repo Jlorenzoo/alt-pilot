@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Validated privileged settings writer for the remote control service.
+set -Eeuo pipefail
+[[ $# -eq 4 ]] || { echo "Expected version, host, min heap and max heap" >&2; exit 2; }
+version="$1" host="$2" heap_min="$3" heap_max="$4"
+[[ "$version" =~ ^[0-9A-Za-z._:+-]{1,40}$ ]] || { echo "Invalid version" >&2; exit 2; }
+[[ "$host" =~ ^[A-Za-z0-9.-]{1,253}(:[0-9]{1,5})?$ ]] || { echo "Invalid host" >&2; exit 2; }
+host_base="${host%%:*}"
+[[ "$host_base" == *.* && "$host_base" != .* && "$host_base" != *. && "$host_base" != *..* ]] || { echo "Invalid host" >&2; exit 2; }
+if [[ "$host" == *:* ]]; then
+  port="${host##*:}"
+  (( port >= 1 && port <= 65535 )) || { echo "Invalid port" >&2; exit 2; }
+fi
+[[ "$heap_min" =~ ^(128|160|192|224|256|320|384)m$ ]] || { echo "Invalid minimum heap" >&2; exit 2; }
+[[ "$heap_max" =~ ^(256|320|384|448|512)m$ ]] || { echo "Invalid maximum heap" >&2; exit 2; }
+min_number="${heap_min%m}"; max_number="${heap_max%m}"
+(( min_number <= max_number )) || { echo "Minimum heap exceeds maximum" >&2; exit 2; }
+tmp="$(mktemp)"
+printf 'MC_VERSION=%s\nMC_SERVER=%s\nJVM_HEAP_XMS=%s\nJVM_HEAP_XMX=%s\n' \
+  "$version" "$host" "$heap_min" "$heap_max" > "$tmp"
+install -o root -g mc -m 640 "$tmp" /etc/alt-pilot/options.env
+rm -f "$tmp"

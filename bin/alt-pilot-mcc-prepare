@@ -1,0 +1,215 @@
+#!/usr/bin/env bash
+# Create/update one isolated, minimal MCC profile. Run as user mc.
+set -Eeuo pipefail
+
+slot="${1:-}"
+[[ "$slot" =~ ^([1-9]|10)$ ]] || { echo "Usage: alt-pilot-mcc-prepare ACCOUNT_NUMBER" >&2; exit 2; }
+[[ "$(id -un)" == mc ]] || { echo "MCC profile preparation must run as mc." >&2; exit 1; }
+
+MC_VERSION=1.12.2 MC_SERVER=eu.mc-complex.com
+if [[ -r /etc/alt-pilot/options.env ]]; then
+  # shellcheck disable=SC1091
+  source /etc/alt-pilot/options.env
+fi
+
+profile="/home/mc/slots/${slot}/mcc"
+source_binary=/opt/alt-pilot/mcc/disk/MinecraftClient
+binary="$profile/MinecraftClient"
+config="$profile/MinecraftClient.ini"
+[[ -x "$source_binary" ]] || { echo "MCC runtime is not installed." >&2; exit 1; }
+mkdir -p "$profile"
+if [[ ! -x "$binary" ]] || ! cmp -s "$source_binary" "$binary"; then
+  install -m 700 "$source_binary" "$binary"
+fi
+
+item_controls_source=/opt/alt-pilot/mcc/item-controls.cs
+[[ -r "$item_controls_source" ]] || { echo "Item controls script is missing." >&2; exit 1; }
+install -m 600 "$item_controls_source" "$profile/item-controls.cs"
+slot_settings="/home/mc/slots/${slot}/settings.json"
+startup_enabled=false
+startup_command="/home alt"
+startup_delay=5
+tpa_auto_accept=false
+tpa_whitelist=""
+
+if [[ -r "$slot_settings" ]]; then
+  startup_enabled="$(jq -r 'if .startup_command_enabled == true then "true" else "false" end' "$slot_settings" 2>/dev/null || echo false)"
+  startup_command="$(jq -r '.startup_command // "/home alt"' "$slot_settings" 2>/dev/null || echo '/home alt')"
+  startup_delay="$(jq -r '.startup_delay // 5' "$slot_settings" 2>/dev/null || echo 5)"
+  tpa_auto_accept="$(jq -r 'if .tpa_auto_accept == true then "true" else "false" end' "$slot_settings" 2>/dev/null || echo false)"
+  tpa_whitelist="$(jq -r '.tpa_whitelist // ""' "$slot_settings" 2>/dev/null || echo '')"
+fi
+
+printf '%s\n' "$tpa_whitelist" > "$profile/item-command-whitelist.txt"
+chmod 600 "$profile/item-command-whitelist.txt"
+[[ "$startup_delay" =~ ^[0-9]+$ ]] || startup_delay=5
+if [[ "$startup_command" != /* ]]; then
+  startup_command="/$startup_command"
+fi
+
+startup_script="$profile/startup.txt"
+if [[ "$startup_enabled" == "true" ]]; then
+  # The configured delay starts only after Skyblock confirms arrival. Allow
+  # chunks and the island server to settle before the one home command.
+  (( startup_delay >= 30 )) || startup_delay=30
+  cat > "$startup_script" <<EOF
+wait $((startup_delay * 20))
+send ${startup_command}
+EOF
+  chmod 600 "$startup_script"
+else
+  rm -f "$startup_script"
+fi
+
+# Explicit Skyblock transfer failure recovery (e.g. redirect timed out on reconnect)
+cat > "$profile/to_skyblock.txt" <<EOF
+wait 60
+send /skyblock
+EOF
+chmod 600 "$profile/to_skyblock.txt"
+
+rm -f "$profile/skyblock_arrival.txt" "$profile/island_retry.txt"
+matches_file="$profile/matches.ini"
+: > "$matches_file"
+
+cat >> "$matches_file" <<EOF
+[Match]
+regex=(?i)Failed to go to server\s+Skyblock:\s+Redirect timed out
+action=script to_skyblock.txt
+actionprivate=script to_skyblock.txt
+actionother=script to_skyblock.txt
+cooldown=15
+EOF
+
+if [[ "$startup_enabled" == "true" ]]; then
+  cat >> "$matches_file" <<EOF
+
+[Match]
+regex=(?i)COMPLEX SKYBLOCK 1\.
+action=script startup.txt
+actionprivate=script startup.txt
+actionother=script startup.txt
+cooldown=600
+EOF
+fi
+
+if [[ "$tpa_auto_accept" == "true" ]]; then
+  names=()
+  for item in ${tpa_whitelist//,/ }; do
+    item="$(echo -n "$item" | tr -d '[:cntrl:]' | tr -d ' ')"
+    [[ -n "$item" ]] || continue
+    # Escape regex metacharacters so a whitelist entry can never inject into or
+    # break the match rule.
+    item="$(printf '%s' "$item" | sed 's/[][\\.^$*+?(){}|]/\\&/g')"
+    names+=("$item")
+  done
+  if [[ ${#names[@]} -gt 0 ]]; then
+    names_regex="$(IFS="|" ; echo "${names[*]}")"
+    cat >> "$matches_file" <<EOF
+
+[Match]
+regex=(?i)^[▌\s]*\(/tpa\).*?(?:\]|\s)(${names_regex})\*?\s+has requested (?:for you to teleport to them|that you teleport to them|to teleport to you|that they teleport to you)
+action=send /tpyes
+actionprivate=send /tpyes
+actionother=send /tpyes
+cooldown=3
+EOF
+  fi
+fi
+chmod 600 "$matches_file"
+
+account_line='Account = { Login = "", Password = "" }'
+if [[ -f "$config" ]]; then
+  found="$(grep -E '^[[:space:]]*Account[[:space:]]*=[[:space:]]*\{' "$config" | head -1 || true)"
+  [[ -n "$found" ]] && account_line="$found"
+fi
+
+tmp="$(mktemp "$profile/MinecraftClient.ini.XXXXXX")"
+cat > "$tmp" <<EOF
+[Main]
+[Main.General]
+${account_line}
+Server = { Host = "${MC_SERVER}" }
+AccountType = "microsoft"
+Method = "mcc"
+
+[Main.Advanced]
+EnableSentry = false
+Language = "en_us"
+LoadMccTranslation = false
+LoadResourcePackTranslations = false
+LoadForgeModTranslations = false
+AutoDiscoverForgeModTranslationSources = false
+InternalCmdChar = "backslash"
+MessageCooldown = 1.0
+MinecraftVersion = "${MC_VERSION}"
+EnableForge = "auto"
+BrandInfo = "vanilla"
+ShowGithubStarReminder = false
+TerrainAndMovements = false
+InventoryHandling = true
+EntityHandling = false
+SessionCache = "disk"
+ProfileKeyCache = "disk"
+ResolveSrvRecords = "fast"
+PlayerHeadAsIcon = false
+ExitOnFailure = false
+CacheScript = false
+Timestamps = true
+AutoRespawn = false
+
+[Logging]
+DebugMessages = false
+PacketDebugMessages = false
+ChatMessages = true
+InfoMessages = true
+WarningMessages = true
+ErrorMessages = true
+LogToFile = false
+
+[Console]
+[Console.General]
+ConsoleMode = "classic"
+# Preserve Minecraft's semantic chat colours for the dashboard console. The
+# web formatter safely renders MCC's VT100 sequences as accessible CSS spans.
+ConsoleColorMode = "vt100_4bit"
+Display_Icon_Banner = false
+Display_Input = false
+Display_Chat = true
+History_Input_Records = 0
+
+[MCSettings]
+Enabled = true
+Locale = "en_US"
+RenderDistance = 2
+ChatMode = "enabled"
+ChatColors = true
+MainHand = "right"
+
+[ChatBot]
+[ChatBot.AutoRelog]
+Enabled = true
+Delay = { min = 8.0, max = 60.0 }
+Retries = -1
+Ignore_Kick_Message = false
+Kick_Messages = [ "Connection has been lost", "Server is restarting", "Server is full", "Too Many people" ]
+
+[ChatBot.AntiAFK]
+Enabled = false
+
+[ChatBot.AutoRespond]
+Enabled = true
+Matches_File = "matches.ini"
+Match_Colors = false
+
+[ChatBot.ScriptScheduler]
+Enabled = true
+[[ChatBot.ScriptScheduler.TaskList]]
+Task_Name = "ALT Pilot chat and item controls"
+Trigger_On_First_Login = true
+Trigger_On_Login = false
+Action = "script item-controls.cs"
+EOF
+
+mv "$tmp" "$config"
+chmod 600 "$config"

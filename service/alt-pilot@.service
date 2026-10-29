@@ -1,0 +1,41 @@
+[Unit]
+Description=Lightweight Minecraft Console Client AFK session (saved account %i)
+After=network-online.target
+Wants=network-online.target
+# Network outages must never exhaust retries and strand an AFK account.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=mc
+Group=mc
+WorkingDirectory=/home/mc
+Environment=MC_AFK_SLOT=%i
+ExecStart=/usr/local/bin/alt-pilot-mcc-run
+KillSignal=SIGINT
+TimeoutStopSec=30
+Restart=on-failure
+RestartSec=30
+SuccessExitStatus=130
+Slice=alt-pilot.slice
+Nice=10
+CPUWeight=40
+# Allow authenticated login and Roslyn startup to coexist without GC thrashing.
+# The shared slice retains the combined VM memory cap.
+MemoryHigh=280M
+MemoryMax=320M
+StandardOutput=append:/opt/alt-pilot/logs/afk-%i.log
+StandardError=append:/opt/alt-pilot/logs/afk-%i.log
+KillMode=control-group
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/home/mc /opt/alt-pilot
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+# WebRTC ICE needs getifaddrs/netlink to discover the host interfaces.
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
+
+[Install]
+WantedBy=multi-user.target
