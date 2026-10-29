@@ -44,7 +44,7 @@ fi
             for tool in ['ss', 'logger']:
                 file = root / tool
                 file.write_text('#!/bin/bash\necho pid=123\nexit 0\n' if tool == 'ss' else '#!/bin/bash\nexit 0\n')
-                file.chmod(0o755)
+            (root / 'uptime').write_text('1000.0 1000.0\n')
             script = (ROOT / 'bin/alt-pilot-watchdog').read_text()
             script = script.replace('/usr/local/bin/afk-bedrock-connected', str(status_helper))
             script = script.replace('/etc/alt-pilot/options.env', str(root / 'options.env'))
@@ -52,6 +52,7 @@ fi
             script = script.replace('/sys/fs/cgroup', str(root / 'cgroup'))
             script = script.replace('/usr/local/sbin/alt-pilot-hub-recovery.py', str(helper))
             script = script.replace('/run/alt-pilot', str(root / 'run/alt-pilot'))
+            script = script.replace('/proc/uptime', str(root / 'uptime'))
             result = subprocess.run(['bash', '-c', '\n'.join([script] * runs)], text=True, capture_output=True,
                                     env={**os.environ, 'PATH': f'{root}:{os.environ["PATH"]}',
                                          'TEST_BROKEN_HELPER': '1' if broken_helper else '0', 'TEST_STATE': state, 'TEST_FAILED_AT': failed_at,
@@ -78,8 +79,7 @@ fi
         self.assertEqual(self.run_watchdog('inactive'), [])
 
     def test_new_failure_gets_two_minutes_before_watchdog_retry(self):
-        uptime = int(float(Path('/proc/uptime').read_text().split()[0]) * 1000000)
-        self.assertEqual(self.run_watchdog('failed', str(uptime)), [])
+        self.assertEqual(self.run_watchdog('failed', str(1000 * 1000000)), [])
 
     def test_reset_failure_does_not_abort_watchdog(self):
         self.assertEqual(self.run_watchdog('failed', reset_status='1'), ['reset-failed alt-pilot@4.service'])
