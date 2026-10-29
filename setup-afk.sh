@@ -244,27 +244,27 @@ section "Hand-off"
 cat <<EOF
 
 ================================================================
- ORACLE VM READY — public IP: $PUB_IP
+ ALT PILOT IS READY! — Public IP: $PUB_IP
 ================================================================
 
-OPEN THE LOCAL SETUP + CONTROL APP:
+YOUR WEB DASHBOARD (PHONE OR PC):
 
-  $SETUP_AFK_DIR/app.sh
+  URL:      ${REMOTE_URL:-(tunnel starting, run 'afk-url' in 10s)}
+  Username: control
+  Password: ${REMOTE_PASSWORD:-Check $REMOTE_ACCESS_FILE}
 
-REMOTE CONTROL FROM ANY PC:
+Save these credentials! You can change your password anytime in
+the dashboard under Settings -> Security.
 
-  ${REMOTE_URL:-(tunnel still starting)}
+To connect your Minecraft account:
+1. Open the URL above in your browser.
+2. Sign in with username 'control' and the password above.
+3. Click "Add Account" and sign in with Microsoft (https://microsoft.com/link).
+4. Enter your Minecraft server address and click Start.
+   Once connected, your alt runs 24/7 in the cloud!
 
-The password is stored locally with mode 0600 at:
-  $REMOTE_ACCESS_FILE
-
-Or, if you'd rather skip the wizard and do it manually:
-
-  ssh ubuntu@$PUB_IP
-  sudo afk-wizard           # terminal fallback
-  afk-status                # once service is up
-  afk-logs                  # tail the logs
-
-State cached at: $STATE_FILE
+Lost your URL later?
+- In Cloud Shell or SSH: run 'afk-url'
+- Credentials saved locally: $REMOTE_ACCESS_FILE
 ================================================================
 EOF

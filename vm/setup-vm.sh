@@ -200,7 +200,7 @@ install -m 755 "$SETUP_VM_DIR/../bin/afk-bedrock-connected" /usr/local/bin/afk-b
 section "4/6 Launcher + helpers"
 
 install -m 755 "$SETUP_VM_DIR/launch-mcc.sh" /usr/local/bin/alt-pilot-mcc-run
-for helper in afk-status afk-start afk-stop afk-restart afk-logs afk-health-json afk-mcc-profile-name; do
+for helper in afk-status afk-url afk-start afk-stop afk-restart afk-logs afk-health-json afk-mcc-profile-name; do
   install -m 755 "$SETUP_VM_DIR/../bin/$helper" "/usr/local/bin/$helper"
 done
 install -m 755 "$SETUP_VM_DIR/../bin/afk-control-logs" /usr/local/bin/afk-control-logs

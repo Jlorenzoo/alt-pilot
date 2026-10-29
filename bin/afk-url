@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# afk-url — print the live HTTPS dashboard URL for ALT Pilot
+set -e
+
+# 1. Check Tailscale Funnel
+if command -v tailscale >/dev/null 2>&1; then
+  ts_url="$(tailscale funnel status --json 2>/dev/null | jq -r '(.Web // {}) | to_entries | map(select(.value.Handlers // {} | to_entries | any(.value.Proxy == "http://127.0.0.1:8765"))) | first | .key // empty' 2>/dev/null | sed -E 's/:443$//' || true)"
+  if [[ -n "$ts_url" ]]; then
+    echo "https://$ts_url"
+    exit 0
+  fi
+fi
+
+# 2. Check Cloudflare Tunnel
+cf_url="$(journalctl -u alt-pilot-tunnel.service -n 60 --no-pager 2>/dev/null | grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' | tail -1 || true)"
+if [[ -n "$cf_url" ]]; then
+  echo "$cf_url"
+  exit 0
+fi
+
+echo "Dashboard tunnel is initializing. Check: systemctl status alt-pilot-tunnel" >&2
+exit 1
