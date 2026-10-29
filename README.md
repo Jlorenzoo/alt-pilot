@@ -25,21 +25,35 @@ Paste this single command into the Cloud Shell terminal and press **Enter**:
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Jlorenzoo/alt-pilot/main/setup-cloudshell.sh)"
 ```
 
-### 3. What Happens Automatically
+### 3. What Happens Automatically (Zero Manual VM Setup)
+You do **not** need to manually click around Oracle Cloud Console or pick shapes:
 - Verifies your tenancy's Always Free quota.
-- Launches an Always Free `VM.Standard.E2.1.Micro` instance with Ubuntu 22.04 LTS.
+- Automatically launches an Always Free `VM.Standard.E2.1.Micro` instance running Ubuntu 22.04 LTS.
 - Configures dedicated, unprivileged system users (`mc` and `afk-control`).
 - Installs the client runtimes, watchdog services, and web dashboard.
-- Establishes a secure, encrypted HTTPS tunnel (Cloudflare Tunnel or Tailscale).
 - Prints your **Dashboard URL** and **Initial Password**.
 
-### 4. Connect Your Minecraft Account
-1. Open the **Dashboard URL** from your terminal in any browser.
-2. Log in using the generated password.
-3. Click **Add Account** → choose **Java** or **Bedrock**.
-4. Click **Sign in with Microsoft** and follow the standard device-code link (`https://microsoft.com/link`).
-5. Enter the Minecraft server address (e.g. `hub.mc-complex.com`).
-6. Once the dashboard shows **Connected**, your bot is running 24/7 in the cloud. **You can safely turn off your PC!**
+### 4. Open Dashboard & Connect Your Minecraft Account
+You have two ways to access your dashboard:
+
+- **Option A — Local Desktop App (Permanent URL: `http://127.0.0.1:8765/`)**
+  Run directly on your PC/Mac/Linux machine:
+  ```bash
+  git clone https://github.com/Jlorenzoo/alt-pilot.git
+  cd alt-pilot
+  ./install.sh YOUR_VM_PUBLIC_IP
+  ./app.sh
+  ```
+  *(Optional: run `./install-desktop.sh` to install the desktop launcher with the grass-block icon. Press Super/Windows key, type `minecraft`, and click ALT Pilot!)*
+
+- **Option B — Cloud Web Dashboard (Access from Phone or Browser)**
+  Open the HTTPS URL printed in your Cloud Shell terminal. (If you ever forget or lose the URL, simply run `afk-url` in Cloud Shell or on the VM).
+
+Once in the dashboard:
+1. Click **Add Account** → choose **Java** or **Bedrock**.
+2. Click **Sign in with Microsoft** and follow the standard device-code link (`https://microsoft.com/link`).
+3. Enter the Minecraft server address (e.g. `hub.mc-complex.com`).
+4. Once the dashboard shows **Connected**, your bot is running 24/7 in the cloud. **You can safely turn off your PC!**
 
 ---
 

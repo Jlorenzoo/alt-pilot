@@ -240,6 +240,11 @@ fi
 [[ -n "$REMOTE_URL" ]] && ok "Remote control URL: $REMOTE_URL" \
   || warn "The remote control URL was not ready yet; check Tailscale or tunnel service status."
 
+# Backup client state to the VM so client computers can run ./install.sh <IP>
+tar -C "$SETUP_AFK_DIR" -czf - .state \
+  | ssh -o BatchMode=yes -o IdentityFile="${SSH_KEY%.pub}" "ubuntu@$PUB_IP" \
+      'sudo -n sh -c "cat > /etc/alt-pilot/client-state.tar.gz && chmod 600 /etc/alt-pilot/client-state.tar.gz"' 2>/dev/null || true
+
 section "Hand-off"
 cat <<EOF
 
@@ -247,18 +252,29 @@ cat <<EOF
  ALT PILOT IS READY! — Public IP: $PUB_IP
 ================================================================
 
-YOUR WEB DASHBOARD (PHONE OR PC):
+TWO WAYS TO USE YOUR DASHBOARD:
 
-  URL:      ${REMOTE_URL:-(tunnel starting, run 'afk-url' in 10s)}
-  Username: control
-  Password: ${REMOTE_PASSWORD:-Check $REMOTE_ACCESS_FILE}
+1. 🖥️ LOCAL DESKTOP APP (Permanent URL — Just like my app):
+   Run on your own PC/laptop:
+     git clone https://github.com/Jlorenzoo/alt-pilot.git
+     cd alt-pilot
+     ./install.sh $PUB_IP
+     ./app.sh
+
+   Permanent local address: http://127.0.0.1:8765/
+   (Optional: run ./install-desktop.sh to add the grass-block desktop launcher)
+
+2. 🌐 CLOUD REMOTE ACCESS (Direct via Phone or Web Browser):
+   URL:      ${REMOTE_URL:-(tunnel starting, run 'afk-url' in 10s)}
+   Username: control
+   Password: ${REMOTE_PASSWORD:-Check $REMOTE_ACCESS_FILE}
 
 Save these credentials! You can change your password anytime in
 the dashboard under Settings -> Security.
 
 To connect your Minecraft account:
-1. Open the URL above in your browser.
-2. Sign in with username 'control' and the password above.
+1. Open either URL in your browser.
+2. Sign in with username 'control' and the password above (or zero-login on local app).
 3. Click "Add Account" and sign in with Microsoft (https://microsoft.com/link).
 4. Enter your Minecraft server address and click Start.
    Once connected, your alt runs 24/7 in the cloud!
@@ -268,3 +284,4 @@ Lost your URL later?
 - Credentials saved locally: $REMOTE_ACCESS_FILE
 ================================================================
 EOF
+

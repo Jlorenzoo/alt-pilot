@@ -77,19 +77,42 @@ At the end of installation, the Cloud Shell terminal displays:
 
 ```text
 ================================================================
- ORACLE VM READY — public IP: xxx.xxx.xxx.xxx
+ ALT PILOT IS READY! — Public IP: 129.151.xx.xx
 ================================================================
 
-REMOTE CONTROL FROM ANY PC / PHONE:
-  https://random-name.trycloudflare.com
+TWO WAYS TO USE YOUR DASHBOARD:
 
-Username: control
-Password: <randomly-generated-password>
+1. 🖥️ LOCAL DESKTOP APP (Permanent URL — Just like my app):
+   Run on your own PC/laptop:
+     git clone https://github.com/Jlorenzoo/alt-pilot.git
+     cd alt-pilot
+     ./install.sh 129.151.xx.xx
+     ./app.sh
+
+   Permanent local address: http://127.0.0.1:8765/
+   (Optional: run ./install-desktop.sh to add the grass-block desktop launcher)
+
+2. 🌐 CLOUD REMOTE ACCESS (Direct via Phone or Web Browser):
+   URL:      https://random-name.trycloudflare.com
+   Username: control
+   Password: <randomly-generated-password>
 ```
 
-1. Click or copy the HTTPS link into your browser.
-2. Enter the username `control` and the one-time generated password.
-3. You will land on the **ALT Pilot Web Dashboard**, featuring real-time status, account slots, live console logs, and resource monitors.
+### Which Option Should I Choose?
+
+#### Option 1: Local Desktop App (Recommended for PC users)
+If you are on your personal computer, this gives you the exact same workflow as the maintainer's app:
+- **Permanent URL:** Always runs on `http://127.0.0.1:8765/`.
+- **Zero Login Friction:** No passwords needed on localhost.
+- **Desktop Shortcut:** Run `./install-desktop.sh` once. Afterwards, just hit your Windows/Super key, type `minecraft`, and click the grass-block icon!
+- Behind the scenes, the local app connects to your Oracle VM securely over SSH.
+
+#### Option 2: Cloud Remote Access (For Phones, Tablets, or Remote Browsers)
+If you want to check on your bot from your iPhone, Android, or work computer without installing anything:
+- Open the HTTPS link shown in your terminal.
+- Sign in with username `control` and the generated password.
+- **How to find your URL if you lose it:** Run `afk-url` in Cloud Shell or on your VM.
+- **Want a permanent cloud URL?** If you use [Tailscale](https://tailscale.com) (free), running `tailscale funnel 8765` assigns a permanent HTTPS address (`https://your-server.your-tailnet.ts.net`) that never changes.
 
 ---
 

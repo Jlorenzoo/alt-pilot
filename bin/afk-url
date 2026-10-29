@@ -1,22 +1,70 @@
 #!/usr/bin/env bash
-# afk-url — print the live HTTPS dashboard URL for ALT Pilot
-set -e
+# afk-url — print the dashboard URL and connection information for ALT Pilot
+set -Eeuo pipefail
 
-# 1. Check Tailscale Funnel
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd || true)"
+STATE_FILE="$ROOT_DIR/.state/remote-access.json"
+VM_FILE="$ROOT_DIR/.state/vm.json"
+
+RAW=0
+[[ "${1:-}" == "--raw" || "${1:-}" == "-r" ]] && RAW=1
+
+# 1. Check if Tailscale Funnel is running on this machine (Permanent Cloud HTTPS)
+ts_url=""
 if command -v tailscale >/dev/null 2>&1; then
   ts_url="$(tailscale funnel status --json 2>/dev/null | jq -r '(.Web // {}) | to_entries | map(select(.value.Handlers // {} | to_entries | any(.value.Proxy == "http://127.0.0.1:8765"))) | first | .key // empty' 2>/dev/null | sed -E 's/:443$//' || true)"
-  if [[ -n "$ts_url" ]]; then
-    echo "https://$ts_url"
-    exit 0
-  fi
 fi
 
-# 2. Check Cloudflare Tunnel
-cf_url="$(journalctl -u alt-pilot-tunnel.service -n 60 --no-pager 2>/dev/null | grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' | tail -1 || true)"
-if [[ -n "$cf_url" ]]; then
-  echo "$cf_url"
+# 2. Check Cloudflare Tunnel on this machine
+cf_url=""
+if command -v journalctl >/dev/null 2>&1; then
+  cf_url="$(journalctl -u alt-pilot-tunnel.service -n 60 --no-pager 2>/dev/null | grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' | tail -1 || true)"
+fi
+
+# 3. Check local saved remote access credentials from Cloud Shell / setup
+saved_url=""
+saved_pass=""
+if [[ -f "$STATE_FILE" ]]; then
+  saved_url="$(jq -r '.url // empty' "$STATE_FILE" 2>/dev/null || true)"
+  saved_pass="$(jq -r '.password // empty' "$STATE_FILE" 2>/dev/null || true)"
+fi
+
+ACTIVE_URL="${ts_url:+https://$ts_url}"
+ACTIVE_URL="${ACTIVE_URL:-$cf_url}"
+ACTIVE_URL="${ACTIVE_URL:-$saved_url}"
+
+if [[ "$RAW" -eq 1 ]]; then
+  if [[ -n "$ACTIVE_URL" ]]; then
+    echo "$ACTIVE_URL"
+    exit 0
+  fi
+  echo "http://127.0.0.1:8765"
   exit 0
 fi
 
-echo "Dashboard tunnel is initializing. Check: systemctl status alt-pilot-tunnel" >&2
-exit 1
+echo "================================================================"
+echo " ALT PILOT DASHBOARD ACCESS"
+echo "================================================================"
+
+if [[ -f "$VM_FILE" || -f "$ROOT_DIR/app.sh" ]]; then
+  echo ""
+  echo " 🖥️  LOCAL DESKTOP APP (Permanent URL — Just like my app):"
+  echo "    URL:     http://127.0.0.1:8765/"
+  echo "    Launch:  ./app.sh"
+  echo "    Desktop: ./install-desktop.sh (press Super key, search 'minecraft')"
+fi
+
+echo ""
+echo " 🌐 CLOUD REMOTE ACCESS (Phone & Mobile Browsers):"
+if [[ -n "$ACTIVE_URL" ]]; then
+  echo "    URL:      $ACTIVE_URL"
+  if [[ -n "$saved_pass" ]]; then
+    echo "    Username: control"
+    echo "    Password: $saved_pass"
+  fi
+else
+  echo "    Status:   Tunnel starting or not active on this host."
+  echo "    Hint:     Check 'systemctl status alt-pilot-tunnel' on the VM."
+fi
+echo "================================================================"
