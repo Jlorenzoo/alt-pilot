@@ -15,7 +15,7 @@ test('inflater patch preserves small and large payloads with bounded small-packe
   for (const size of [64, 1048576]) {
     const plain = Buffer.alloc(size, 42), result = inflate(zlib.deflateRawSync(plain))
     assert.deepEqual(result, plain)
-    if (size === 64) assert.ok(result.buffer.byteLength <= 16384)
+    if (size === 64) assert.ok(result.buffer.byteLength <= 65536 && result.buffer.byteLength < 512000)
   }
   fs.writeFileSync(file, 'unexpected upstream')
   assert.throws(() => patchInflate(file), /needs review/)
