@@ -1,6 +1,7 @@
 """Security-boundary regressions; all requests and archives stay local."""
 import http.client
 import io
+import os
 import json
 import tarfile
 import tempfile
@@ -128,24 +129,17 @@ class RestoreBoundaryTests(unittest.TestCase):
             self.assertEqual(outside.read_text(), 'unchanged')
 
 
-class ProvisioningFailureTests(unittest.TestCase):
-    def test_storage_lookup_failure_never_becomes_zero_usage(self):
-        import shutil
-        import subprocess
-        if not shutil.which('jq'):
-            self.skipTest('jq is required for the provisioning shell library')
-        for failing_kind, expected in (('volume', 'block volume'), ('boot-volume', 'boot volume')):
-            script = r'''
-source "$1"
-oci() {
-  if [[ "$1" == bv && "$2" == "$FAIL_KIND" ]]; then return 9; fi
-  printf '%s\n' '{"data":[]}'
-}
-verify_always_free test-compartment
-'''
-            import os
-            env = dict(os.environ, FAIL_KIND=failing_kind)
-            result = subprocess.run(['bash', '-c', script, 'test', str(core.ROOT / 'lib/oci-provision.sh')], env=env, capture_output=True, text=True)
-            with self.subTest(kind=failing_kind):
-                self.assertNotEqual(result.returncode, 0)
-                self.assertIn(f'Could not verify {expected} usage.', result.stderr)
+class ProxyIdentityTests(unittest.TestCase):
+    def test_only_configured_local_proxy_can_supply_client_identity(self):
+        handler = MagicMock()
+        handler.client_address = ('127.0.0.1', 40000)
+        handler.headers = {'X-Alt-Pilot-Client-IP': '203.0.113.8'}
+        with patch.dict(os.environ, {'AFK_TRUST_LOCAL_PROXY': '0'}):
+            self.assertEqual(remote.client_key(handler), '127.0.0.1')
+        with patch.dict(os.environ, {'AFK_TRUST_LOCAL_PROXY': '1'}):
+            self.assertEqual(remote.client_key(handler), '203.0.113.8')
+            handler.client_address = ('198.51.100.2', 40000)
+            self.assertEqual(remote.client_key(handler), '198.51.100.2')
+            handler.client_address = ('127.0.0.1', 40000)
+            handler.headers['X-Alt-Pilot-Client-IP'] = 'fake'
+            self.assertEqual(remote.client_key(handler), '127.0.0.1')

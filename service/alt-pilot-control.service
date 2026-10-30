@@ -11,6 +11,7 @@ WorkingDirectory=/opt/alt-pilot/control
 ExecStart=/usr/bin/python3 /opt/alt-pilot/control/remote_control.py --port 8765
 Restart=on-failure
 RestartSec=5
+EnvironmentFile=-/etc/alt-pilot/proxy.env
 UMask=0077
 # The service uses sudo for a small, exact command allowlist in
 # /etc/sudoers.d/alt-pilot-control. No arbitrary command is permitted.
@@ -29,7 +30,7 @@ AmbientCapabilities=
 PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=read-only
-ReadWritePaths=/etc/alt-pilot /home/mc
+ReadWritePaths=/etc/alt-pilot /var/lib/alt-pilot /home/mc
 ProtectControlGroups=true
 MemoryMax=80M
 

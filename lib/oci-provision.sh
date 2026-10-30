@@ -22,22 +22,11 @@ require_oci_cli() {
 
 # --- Detect home region from the user's config ---
 detect_home_region() {
-  local cfg="${OCI_CLI_CONFIG_FILE:-$HOME/.oci/config}"
-  local region
-  region="$(grep -E '^[[:space:]]*region=' "$cfg" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d ' ' || true)"
-  [[ -n "$region" ]] || die "Could not detect region from $cfg"
-  printf '%s' "$region"
+  python3 "$OCI_LIB_DIR/../tools/oci_environment.py" home
 }
 
-# --- Detect tenancy OCID from OCI config (also validates auth) ---
 detect_tenancy() {
-  local cfg="${OCI_CLI_CONFIG_FILE:-$HOME/.oci/config}"
-  local tenancy
-  tenancy="$(grep -E '^[[:space:]]*tenancy=' "$cfg" 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"' | tr -d ' ' || true)"
-  if [[ ! "$tenancy" =~ ^ocid1.tenancy. ]]; then
-    die "Could not read tenancy OCID from $cfg"
-  fi
-  printf '%s' "$tenancy"
+  python3 "$OCI_LIB_DIR/../tools/oci_environment.py" identity | jq -er .tenancy
 }
 
 # --- Detect root compartment (== tenancy for most users) ---
@@ -49,13 +38,17 @@ detect_compartment() {
 # --- Detect Always-Free-eligible availability domains in the home region ---
 # Returns a single AD name, preferring ones that are eligible for E2.1.Micro Always Free.
 detect_availability_domain() {
-  local compartment="$1" region="$2"
-  local ad
-  # Try each AD; pick the first one that successfully launches (caller decides).
-  ad="$(oci iam availability-domain list --compartment-id "$compartment" --region "$region" \
-        | jq -r '.data[0].name // empty')"
-  [[ -n "$ad" ]] || die "No availability domains found in $region"
-  printf '%s' "$ad"
+  local compartment="$1" region="$2" ad
+  local domains
+  domains="$(oci iam availability-domain list --compartment-id "$compartment" --region "$region" --all | jq -er '.data[].name')"
+  while IFS= read -r ad; do
+    if oci compute shape list --compartment-id "$compartment" --region "$region" --availability-domain "$ad" --all \
+        | jq -e '.data | any(.shape == "VM.Standard.E2.1.Micro")' >/dev/null; then
+      printf '%s' "$ad"
+      return
+    fi
+  done <<< "$domains"
+  die "Oracle has no E2 Micro shape available in your home region. No paid shape will be substituted."
 }
 
 # --- Find an Ubuntu 22.04 minimal x86_64 image marked Always Free eligible ---
@@ -67,6 +60,7 @@ find_ubuntu_image() {
   oci compute image list \
     --compartment-id "$compartment" \
     --all \
+    --shape "VM.Standard.E2.1.Micro" \
     --operating-system "Canonical Ubuntu" \
     --sort-by TIMECREATED --sort-order DESC \
     2>/dev/null \
@@ -89,7 +83,8 @@ find_existing_vm() {
           | .[]
           | select(.shape == $shape)
           | select(.["display-name"] == $n)
-          | select(."lifecycle-state" == "RUNNING" or ."lifecycle-state" == "STOPPED")
+          | select(.["freeform-tags"]["alt-pilot"] == "managed")
+          | select(."lifecycle-state" != "TERMINATED" and ."lifecycle-state" != "TERMINATING")
          ][0].id // empty'
 }
 
@@ -104,15 +99,17 @@ ensure_subnet() {
   vcn="$(oci network vcn list --compartment-id "$compartment" --region "$region" 2>/dev/null \
           | jq -r '[.data[]
                     | select(."lifecycle-state" == "AVAILABLE")
-                    | select(.["display-name"] == "afk-vcn")
+                    | select(.["display-name"] == "alt-pilot-vcn")
+                    | select(.["freeform-tags"]["alt-pilot"] == "managed")
                   ][0].id // empty')" || die "Could not inspect application networks."
   if [[ -z "$vcn" ]]; then
-    info "Creating VCN afk-vcn (Always Free)" >&2
+    info "Creating your dedicated ALT Pilot network (Always Free)" >&2
     if ! vcn_out="$(oci network vcn create \
           --compartment-id "$compartment" \
           --cidr-blocks '["10.0.0.0/24"]' \
-          --display-name afk-vcn \
-          --dns-label afkvcn 2>&1)"; then
+          --display-name alt-pilot-vcn \
+          --freeform-tags '{"alt-pilot":"managed"}' \
+          --dns-label afkvcn --wait-for-state AVAILABLE 2>&1)"; then
       echo "$vcn_out" >&2
       die "Cannot create or find a VCN in region $region. Your VCN quota is full. Delete an unused VCN in the OCI Console (Networking > VCNs) and re-run."
     fi
@@ -159,6 +156,19 @@ ensure_subnet() {
       ok "Route already present" >&2
     fi
   fi
+  # SSH is restricted to the installing Cloud Shell's current public address.
+  # The dashboard itself is reached through outbound Tailscale, never port 8765.
+  local security_list ingress
+  [[ -n "${SSH_SOURCE_CIDR:-}" ]] || die "Could not establish your Cloud Shell network address."
+  ingress="$(jq -n --arg source "$SSH_SOURCE_CIDR" --arg access "${AFK_REMOTE_ACCESS:-ip}" '[{protocol:"6",source:$source,sourceType:"CIDR_BLOCK",tcpOptions:{destinationPortRange:{min:22,max:22}}}] + (if $access == "ip" then [80,443] | map({protocol:"6",source:"0.0.0.0/0",sourceType:"CIDR_BLOCK",tcpOptions:{destinationPortRange:{min:.,max:.}}}) else [] end)')"
+  security_list="$(oci network security-list list --compartment-id "$compartment" --vcn-id "$vcn" --all | jq -r '[.data[] | select(.["display-name"] == "alt-pilot-ssh")][0].id // empty')"
+  if [[ -z "$security_list" ]]; then
+    security_list="$(oci network security-list create --compartment-id "$compartment" --vcn-id "$vcn" --display-name alt-pilot-ssh \
+      --freeform-tags '{"alt-pilot":"managed"}' --ingress-security-rules "$ingress" \
+      --egress-security-rules '[{"protocol":"all","destination":"0.0.0.0/0","destinationType":"CIDR_BLOCK"}]' | jq -er '.data.id')"
+  else
+    oci network security-list update --security-list-id "$security_list" --ingress-security-rules "$ingress" --force >/dev/null
+  fi
   subnet="$(oci network subnet list --compartment-id "$compartment" 2>/dev/null \
             | jq -r --arg v "$vcn" '[.data[] | select(.["vcn-id"] == $v)][0].id // empty')"
   if [[ -z "$subnet" ]]; then
@@ -168,29 +178,50 @@ ensure_subnet() {
         --vcn-id "$vcn" \
         --cidr-block "10.0.0.0/24" \
         --display-name afk-subnet \
+        --security-list-ids "$(jq -n --arg id "$security_list" '[$id]')" \
         --dns-label afksubnet 2>/dev/null \
         | jq -r '.data.id')" || die "Could not create subnet in VCN"
   fi
+  [[ -n "$subnet" ]] || die "Oracle did not return your app subnet."
+  oci network subnet update --subnet-id "$subnet" --security-list-ids "$(jq -n --arg id "$security_list" '[$id]')" --force >/dev/null
   # CRITICAL: only the subnet ID on stdout, everything else to stderr.
   printf '%s' "$subnet"
+}
+
+# A repair must not create cloud resources just to refresh Cloud Shell access.
+refresh_ssh_access() {
+  local compartment="$1" vm_id="$2" vcn list ingress subnet
+  subnet="$(oci compute instance list-vnics --instance-id "$vm_id" | jq -er '.data[] | select(.["is-primary"] == true) | .["subnet-id"]')"
+  vcn="$(oci network subnet get --subnet-id "$subnet" | jq -er '.data["vcn-id"]')"
+  # Only change this application's explicitly managed security list.
+  list="$(oci network security-list list --compartment-id "$compartment" --vcn-id "$vcn" --all | jq -r '[.data[] | select(.["display-name"] == "alt-pilot-ssh") | select(.["freeform-tags"]["alt-pilot"] == "managed")][0].id // empty')"
+  if [[ -z "$list" ]]; then
+    warn "Your existing server uses an older network. We will keep that network unchanged and set up a stable secure link instead."
+    AFK_REMOTE_ACCESS=funnel
+    export AFK_REMOTE_ACCESS
+    return
+  fi
+  ingress="$(jq -n --arg source "$SSH_SOURCE_CIDR" --arg access "${AFK_REMOTE_ACCESS:-ip}" '[{protocol:"6",source:$source,sourceType:"CIDR_BLOCK",tcpOptions:{destinationPortRange:{min:22,max:22}}}] + (if $access == "ip" then [80,443] | map({protocol:"6",source:"0.0.0.0/0",sourceType:"CIDR_BLOCK",tcpOptions:{destinationPortRange:{min:.,max:.}}}) else [] end)')"
+  oci network security-list update --security-list-id "$list" --ingress-security-rules "$ingress" --force >/dev/null
 }
 
 # --- Launch a new E2.1.Micro instance ---
 # Always Free verification happens BEFORE launch.
 launch_vm() {
   local compartment="$1" ad="$2" subnet="$3" image="$4" name="$5" ssh_key="$6"
-  info "Launching VM $name (shape VM.Standard.E2.1.Micro, Always Free)"
-  # NO --boot-volume-size-in-gbs here. The CLI flag requires min 50 GB.
-  # The E2.1.Micro Always Free shape defaults to 47 GB; that's what we want.
+  info "Launching VM $name (shape VM.Standard.E2.1.Micro, Always Free)" >&2
+  # Explicit 50 GB boot volume, already included in the tenancy-wide check.
   oci compute instance launch \
     --availability-domain "$ad" \
     --compartment-id "$compartment" \
     --display-name "$name" \
     --shape "VM.Standard.E2.1.Micro" \
-    --image-id "$image" \
+    --opc-retry-token "${VM_LAUNCH_RETRY_TOKEN:?Launch retry token is required}" \
+    --freeform-tags '{"alt-pilot":"managed"}' \
+    --source-details "$(jq -n --arg id "$image" '{sourceType:"image",imageId:$id,bootVolumeSizeInGBs:50}')" \
     --subnet-id "$subnet" \
     --assign-public-ip true \
-    --metadata "{\"ssh_authorized_keys\":\"$(cat "$ssh_key" | sed 's/[\/&]/\\&/g')\"}" \
+    --metadata "$(jq -n --rawfile key "$ssh_key" '{ssh_authorized_keys:$key}')" \
     | jq -r '.data.id // (.data["id"] // empty)'
 }
 
@@ -215,38 +246,13 @@ wait_for_vm() {
 # (a repair never creates an instance, so the quota is irrelevant).
 verify_always_free() {
   local compartment="$1" reusable_id="${2:-}" mode="${3:-apply}"
-  local used volume_json boot_json volume_gb boot_gb total_gb
-  used="$(oci compute instance list --compartment-id "$compartment" --all \
-          2>/dev/null \
-          | jq -r '[(.data // [])
-                    | .[]
-                    | select(.shape == "VM.Standard.E2.1.Micro")
-                    | select(."lifecycle-state" == "RUNNING" or ."lifecycle-state" == "STOPPED")
-                  ] | length // 0' 2>/dev/null)"
-  used="${used:-0}"
-  [[ "$used" =~ ^[0-9]+$ ]] || die "Could not verify existing instance usage."
-  if [[ "$used" -ge 2 && -z "$reusable_id" && "$mode" != "repair" ]]; then
-    die "You already have $used VM.Standard.E2.1.Micro instances (Always Free allows 2). Not creating another."
+  local audit used total_gb
+  audit="$(python3 "$OCI_LIB_DIR/../tools/oci_environment.py" inventory --tenancy "$compartment" --region "${OCI_CLI_REGION:?Home region is required}")" || die "Unable to verify tenancy-wide usage. No resource will be created."
+  used="$(jq -er .e2_count <<< "$audit")"
+  total_gb="$(jq -er .storage_gb <<< "$audit")"
+  if [[ "$mode" != repair && -z "$reusable_id" ]]; then
+    (( used < 2 )) || die "Your tenancy already uses $used E2 Micro instances. No paid fallback will be used."
+    jq -en --argjson total "$total_gb" '$total + 50 <= 200' >/dev/null || die "Another 50 GB boot volume would exceed the 200 GB free allowance."
   fi
-  if [[ -n "$reusable_id" ]]; then
-    local shape state
-    shape="$(oci compute instance get --instance-id "$reusable_id" 2>/dev/null | jq -r '.data.shape // empty')"
-    state="$(oci compute instance get --instance-id "$reusable_id" 2>/dev/null | jq -r '.data."lifecycle-state" // empty')"
-    [[ "$shape" == "VM.Standard.E2.1.Micro" ]] || die "Existing VM is not the Always Free E2.1.Micro shape."
-    ok "Existing Always Free VM is reusable ($state); no new instance needed"
-  else
-    ok "Always Free E2.1.Micro usage: $used/2 (one slot available)"
-  fi
-
-  # Oracle's 200 GB Always Free allowance is shared by boot and block volumes.
-  # Refuse a new instance if its 47 GB minimum boot volume would exceed it.
-  volume_json="$(oci bv volume list --compartment-id "$compartment" --all 2>/dev/null)" || die "Could not verify block volume usage."
-  boot_json="$(oci bv boot-volume list --compartment-id "$compartment" --all 2>/dev/null)" || die "Could not verify boot volume usage."
-  volume_gb="$(printf '%s' "$volume_json" | jq '[.data[] | select(."lifecycle-state" != "TERMINATED") | ."size-in-gbs"] | add // 0')"
-  boot_gb="$(printf '%s' "$boot_json" | jq '[.data[] | select(."lifecycle-state" != "TERMINATED") | ."size-in-gbs"] | add // 0')"
-  total_gb=$((volume_gb + boot_gb))
-  if [[ "$mode" != "repair" && -z "$reusable_id" && $((total_gb + 47)) -gt 200 ]]; then
-    die "Block storage is ${total_gb} GB; adding the 47 GB boot volume would exceed the 200 GB Always Free allowance."
-  fi
-  ok "Always Free block storage: ${total_gb}/200 GB$([[ -z "$reusable_id" ]] && printf ' (47 GB planned)' || true)"
+  ok "Tenancy-wide E2 Micro usage: $used/2; boot/block storage: $total_gb/200 GB (50 GB planned for a new VM)"
 }

@@ -8,9 +8,13 @@ python3 "$source_dir/prepare-mcc-runtime.py" "$runtime/MinecraftClient" "$runtim
 # Extract once outside the small client cgroups, then make the shared cache
 # read-only. Clients load the same verified assemblies directly from disk.
 mkdir -p "$runtime/bundle-cache"
+chown -R mc:mc "$runtime/bundle-cache"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
-(cd "$work"; DOTNET_BUNDLE_EXTRACT_BASE_DIR="$runtime/bundle-cache" \
+chown mc:mc "$work"
+chown root:mc "$runtime/disk" "$runtime/disk/MinecraftClient"
+chmod 750 "$runtime/disk" "$runtime/disk/MinecraftClient"
+(cd "$work"; /usr/sbin/runuser -u mc -- env DOTNET_BUNDLE_EXTRACT_BASE_DIR="$runtime/bundle-cache" \
   timeout 120 "$runtime/disk/MinecraftClient" --help > /dev/null)
 chown -R root:mc "$runtime/disk" "$runtime/bundle-cache"
 chmod -R u=rwX,g=rX,o= "$runtime/disk" "$runtime/bundle-cache"

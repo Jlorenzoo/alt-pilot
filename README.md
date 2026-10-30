@@ -1,113 +1,82 @@
-# ALT Pilot — 24/7 Minecraft AFK System
+# ALT Pilot — your Minecraft accounts, running in the cloud
 
 [![CI](https://github.com/Jlorenzoo/alt-pilot/actions/workflows/ci.yml/badge.svg)](https://github.com/Jlorenzoo/alt-pilot/actions/workflows/ci.yml)
 [![Security](https://github.com/Jlorenzoo/alt-pilot/actions/workflows/security.yml/badge.svg)](https://github.com/Jlorenzoo/alt-pilot/actions/workflows/security.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-**ALT Pilot** is an automated, self-hosted 24/7 Minecraft AFK client system designed to run on Oracle Cloud's **100% Always Free tier** (zero cost forever).
+Set up your own Minecraft Java and Bedrock client system in your own Oracle
+account. Manage it through a password-protected HTTPS dashboard. Once an account
+is connected, your computer can be turned off.
 
-It includes a lightweight client runner supporting both **Java Edition** and **Bedrock Edition**, coupled with a responsive, password-protected web dashboard accessible from your phone or desktop browser.
+## Start here — no coding or PC installation
 
----
-
-## ⚡ Quick Start (5 Minutes — No PC Software Needed)
-
-You do **not** need to install anything on your personal computer. Setup runs entirely in your browser using Oracle's built-in Cloud Shell.
-
-### 1. Open Oracle Cloud Shell
-1. Sign in to your [Oracle Cloud Console](https://cloud.oracle.com).
-2. Click the **Developer Tools** icon `>_` (**Cloud Shell**) in the top-right navigation bar.
-
-### 2. Run the 1-Command Installer
-Paste this single command into the Cloud Shell terminal and press **Enter**:
+1. [Create or sign in to your Oracle account](https://cloud.oracle.com).
+2. In Oracle, click **Developer Tools / >_ → Cloud Shell**, then choose **Network → Public**. If Public is missing, the guide has a copy/paste fix.
+3. Paste this line into Cloud Shell and press Enter:
 
 ```bash
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Jlorenzoo/alt-pilot/main/setup-cloudshell.sh)"
 ```
 
-### 3. What Happens Automatically (Zero Manual VM Setup)
-You do **not** need to manually click around Oracle Cloud Console or pick shapes:
-- Verifies your tenancy's Always Free quota.
-- Automatically launches an Always Free `VM.Standard.E2.1.Micro` instance running Ubuntu 22.04 LTS.
-- Configures dedicated, unprivileged system users (`mc` and `afk-control`).
-- Installs the client runtimes, watchdog services, and web dashboard.
-- Prints your **Dashboard URL** and **Initial Password**.
+4. Read the check result, type **YES**, and let setup run. Keep that tab open.
+5. Open the **HTTPS address** it prints and save it as a bookmark.
+6. In the dashboard, choose **Add account → Java, Bedrock or Both** and follow
+   Microsoft's sign-in. Choose your Minecraft server, then select **Start**.
 
-### 4. Open Dashboard & Connect Your Minecraft Account
-You have two ways to access your dashboard:
+**Follow the [step-by-step guide](docs/getting-started.md)** if you have never
+used Oracle Cloud Shell before. It explains each screen and what to do next.
 
-- **Option A — Local Desktop App (Permanent URL: `http://127.0.0.1:8765/`)**
-  Run directly on your PC/Mac/Linux machine:
-  ```bash
-  git clone https://github.com/Jlorenzoo/alt-pilot.git
-  cd alt-pilot
-  ./install.sh YOUR_VM_PUBLIC_IP
-  ./app.sh
-  ```
-  *(Optional: run `./install-desktop.sh` to install the desktop launcher with the grass-block icon. Press Super/Windows key, type `minecraft`, and click ALT Pilot!)*
+The installer does the technical work: cloud checks, VM creation, SSH keys,
+firewall, both runtimes, dashboard, HTTPS certificates and background services.
+You do not need a domain name, Tailscale account, or extra software on your PC.
 
-- **Option B — Cloud Web Dashboard (Access from Phone or Browser)**
-  Open the HTTPS URL printed in your Cloud Shell terminal. (If you ever forget or lose the URL, simply run `afk-url` in Cloud Shell or on the VM).
+## Your bookmark
 
-Once in the dashboard:
-1. Click **Add Account** → choose **Java** or **Bedrock**.
-2. Click **Sign in with Microsoft** and follow the standard device-code link (`https://microsoft.com/link`).
-3. Enter the Minecraft server address (e.g. `hub.mc-complex.com`).
-4. Once the dashboard shows **Connected**, your bot is running 24/7 in the cloud. **You can safely turn off your PC!**
+Your dashboard uses the VM's own address, for example `https://203.0.113.10`.
+The example address is only an illustration; setup prints your real address.
+Its certificate is obtained and renewed automatically. The IP stays assigned
+through Oracle VM stops and restarts. Deleting the VM or its network address
+can change it. No localhost or temporary tunnel is presented as a permanent link.
 
----
-
-## ✨ Features
-
-- **Java & Bedrock Support:** Run vanilla Minecraft Java 1.12.2+ sessions or Bedrock protocol sessions side-by-side.
-- **Multi-Account Slots:** Manage up to 10 independent AFK accounts from one dashboard.
-- **Web Dashboard:** Mobile-optimized, responsive web control center with live console logs, RAM/swap/disk meters, and connection status.
-- **Smart Reconnection Watchdog:** Automatically recovers from server restarts, network timeouts, or kicks without manual intervention.
-- **Chat Whitelist & Item Drop Controls:** Authorized team players can trigger whitelisted in-game actions (e.g. `/tpa` auto-accept or XP drops) without opening the account to strangers.
-- **Zero Local Footprint:** Server runs entirely in the cloud; manage everything via browser.
-
----
-
-## 🔒 Security & Privacy
-
-- **100% Isolated Tenancy:** Every teammate installs into their own personal Oracle account. No shared servers, tokens, keys, or player whitelists.
-- **Least-Privilege Isolation:**
-  - Minecraft game processes run under the unprivileged `mc` user.
-  - The dashboard runs under a restricted `afk-control` service with strict systemd filesystem sandboxing (`ProtectSystem=strict`, `PrivateTmp`).
-- **Official Microsoft OAuth:** All account authentication uses official Microsoft Device Code OAuth. Passwords and credentials never touch ALT Pilot.
-- **Encrypted Remote Access:** The web dashboard listens strictly on loopback (`127.0.0.1`) and is served remotely through encrypted HTTPS tunnels with login rate-limiting.
-
----
-
-## 📖 In-Depth Guides
-
-- [**Step-by-Step Teammate Guide**](docs/getting-started.md) — Detailed illustrated walkthrough, Oracle Free Tier signup instructions, troubleshooting, updates, and uninstallation.
-- [**Security Policy**](SECURITY.md) — Security boundaries and vulnerability reporting.
-
----
-
-## 🛠️ Management & Commands
-
-From the Oracle Cloud Shell (or via SSH on your VM):
+Lost the address? In Oracle Cloud Shell paste:
 
 ```bash
-# Check status of all running AFK accounts
-afk-status
-
-# View live console logs
-afk-logs
-
-# Start, stop, or restart an account
-afk-start
-afk-stop
-afk-restart
-
-# Run the local Control Center UI locally
-./app.sh
+~/alt-pilot/setup-cloudshell.sh --status
 ```
 
----
+If setup was interrupted, run the original command again. It resumes your saved
+VM rather than creating another one. Your saved Minecraft sign-ins are retained
+when repairing the app.
 
-## 📄 License
+## Cost and capacity
 
-ALT Pilot is released under the [MIT License](LICENSE).
+The installer selects one Always Free-eligible E2 Micro and a 50 GB boot disk in
+your actual Oracle home region. It checks existing E2 and boot/block storage
+usage across compartments and stops if it cannot verify usage or there is no
+room in the free allowance. It never changes to a paid VM shape to bypass an
+error. Oracle still controls eligibility, capacity and idle-instance reclamation;
+this project cannot promise unlimited uptime or unchanging provider terms.
+
+Start with one Minecraft account. Up to ten accounts can be saved; the number
+that can run together depends on the 1 GB VM's available memory and editions.
+Both Java and Bedrock runtimes are installed automatically. The destination
+Minecraft server must support the selected client version and permit the account.
+
+## Security and ownership
+
+Each person uses their own Oracle and Microsoft accounts. No maintainer server,
+SSH key, trusted-player list, or Microsoft token is inherited. Minecraft passwords
+are entered only on Microsoft's official sign-in page; the app stores the tokens
+needed to keep the session running privately on your VM.
+
+The dashboard requires a password, listens on loopback, and is exposed through
+an isolated HTTPS proxy. Privileged settings files are kept separate from mutable
+session data. Dependency builds run without root; runtimes and additional build
+inputs are pinned and checked. See [SECURITY.md](SECURITY.md).
+
+## For developers
+
+Run `python3 -m unittest discover -s tests` and
+`node --test tests/*.test.js bedrock/*.test.js` after installing the locked Bedrock
+dependencies. See the workflows for the clean VM smoke test and security scans.
+
+[MIT license](LICENSE).

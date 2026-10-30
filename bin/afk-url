@@ -1,70 +1,30 @@
 #!/usr/bin/env bash
-# afk-url — print the dashboard URL and connection information for ALT Pilot
+# Print the persistent HTTPS endpoint; never substitute localhost or a temporary URL.
 set -Eeuo pipefail
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." 2>/dev/null && pwd || true)"
-STATE_FILE="$ROOT_DIR/.state/remote-access.json"
-VM_FILE="$ROOT_DIR/.state/vm.json"
-
-RAW=0
-[[ "${1:-}" == "--raw" || "${1:-}" == "-r" ]] && RAW=1
-
-# 1. Check if Tailscale Funnel is running on this machine (Permanent Cloud HTTPS)
-ts_url=""
-if command -v tailscale >/dev/null 2>&1; then
-  ts_url="$(tailscale funnel status --json 2>/dev/null | jq -r '(.Web // {}) | to_entries | map(select(.value.Handlers // {} | to_entries | any(.value.Proxy == "http://127.0.0.1:8765"))) | first | .key // empty' 2>/dev/null | sed -E 's/:443$//' || true)"
+root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+url=""
+if [[ -f /etc/alt-pilot/dashboard-url ]]; then url="$(cat /etc/alt-pilot/dashboard-url)"; fi
+if [[ -z "$url" ]] && command -v tailscale >/dev/null 2>&1; then
+  url="$(tailscale funnel status --json 2>/dev/null | jq -r '(.AllowFunnel // {}) as $allowed | (.Web // {}) | to_entries[] | select($allowed[.key] == true) | select(.value.Handlers // {} | to_entries | any(.value.Proxy == "http://127.0.0.1:8765")) | .key' | head -1 | sed -E 's/:443$//' || true)"
+  [[ -z "$url" ]] || url="https://$url"
 fi
-
-# 2. Check Cloudflare Tunnel on this machine
-cf_url=""
-if command -v journalctl >/dev/null 2>&1; then
-  cf_url="$(journalctl -u alt-pilot-tunnel.service -n 60 --no-pager 2>/dev/null | grep -Eo 'https://[-a-z0-9]+\.trycloudflare\.com' | tail -1 || true)"
+if [[ -z "$url" && -f "$root/.state/remote-access.json" ]]; then
+  url="$(jq -r 'select(.temporary_url == false) | .url // empty' "$root/.state/remote-access.json")"
 fi
-
-# 3. Check local saved remote access credentials from Cloud Shell / setup
-saved_url=""
-saved_pass=""
-if [[ -f "$STATE_FILE" ]]; then
-  saved_url="$(jq -r '.url // empty' "$STATE_FILE" 2>/dev/null || true)"
-  saved_pass="$(jq -r '.password // empty' "$STATE_FILE" 2>/dev/null || true)"
+if ! python3 - "$url" <<'PY'
+import ipaddress,sys,urllib.parse
+try:
+    u=urllib.parse.urlsplit(sys.argv[1])
+    if u.scheme != 'https' or u.username or u.password or u.port not in (None,443) or u.path not in ('','/') or u.query or u.fragment: raise ValueError()
+    try: valid=ipaddress.IPv4Address(u.hostname).is_global
+    except ValueError: valid=bool(u.hostname and u.hostname.endswith('.ts.net'))
+    if not valid: raise ValueError()
+except (ValueError,TypeError): raise SystemExit(1)
+PY
+then
+  echo 'Your permanent dashboard link is not ready. Run the Cloud Shell installer again to finish setup.' >&2
+  exit 1
 fi
-
-ACTIVE_URL="${ts_url:+https://$ts_url}"
-ACTIVE_URL="${ACTIVE_URL:-$cf_url}"
-ACTIVE_URL="${ACTIVE_URL:-$saved_url}"
-
-if [[ "$RAW" -eq 1 ]]; then
-  if [[ -n "$ACTIVE_URL" ]]; then
-    echo "$ACTIVE_URL"
-    exit 0
-  fi
-  echo "http://127.0.0.1:8765"
-  exit 0
+if [[ "${1:-}" == --raw || "${1:-}" == -r ]]; then printf '%s\n' "$url"; else
+  printf 'Your ALT Pilot dashboard:\n  %s\n\nUse your dashboard password to sign in.\n' "$url"
 fi
-
-echo "================================================================"
-echo " ALT PILOT DASHBOARD ACCESS"
-echo "================================================================"
-
-if [[ -f "$VM_FILE" || -f "$ROOT_DIR/app.sh" ]]; then
-  echo ""
-  echo " 🖥️  LOCAL DESKTOP APP (Permanent URL — Just like my app):"
-  echo "    URL:     http://127.0.0.1:8765/"
-  echo "    Launch:  ./app.sh"
-  echo "    Desktop: ./install-desktop.sh (press Super key, search 'minecraft')"
-fi
-
-echo ""
-echo " 🌐 CLOUD REMOTE ACCESS (Phone & Mobile Browsers):"
-if [[ -n "$ACTIVE_URL" ]]; then
-  echo "    URL:      $ACTIVE_URL"
-  if [[ -n "$saved_pass" ]]; then
-    echo "    Username: control"
-    echo "    Password: $saved_pass"
-  fi
-else
-  echo "    Status:   Tunnel starting or not active on this host."
-  echo "    Hint:     Check 'systemctl status alt-pilot-tunnel' on the VM."
-fi
-echo "================================================================"

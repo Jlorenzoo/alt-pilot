@@ -33,3 +33,37 @@ jobs:
           node --check web/app.js
           node --check web/console-format.js
           while IFS= read -r script; do bash -n "$script"; done < <(find . -type f -name '*.sh' -print)
+
+  vm-smoke:
+    name: Disposable Ubuntu install
+    runs-on: ubuntu-22.04
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install both runtimes and controller on the disposable runner
+        run: sudo env AFK_REMOTE_ACCESS=none bash vm/setup-vm.sh
+      - name: Verify services, login, permissions and password rotation
+        run: sudo env AFK_DISPOSABLE_TEST=1 python3 tools/vm_smoke.py
+      - name: Repair in place and verify again
+        run: |
+          sudo env AFK_REMOTE_ACCESS=none bash vm/setup-vm.sh
+          sudo env AFK_DISPOSABLE_TEST=1 python3 tools/vm_smoke.py
+
+  https-smoke:
+    name: IP HTTPS certificate
+    runs-on: ubuntu-22.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Download verified HTTPS proxy
+        run: |
+          mkdir -p /tmp/alt-pilot-https-test
+          curl -fsSL --retry 3 https://github.com/caddyserver/caddy/releases/download/v2.11.7/caddy_2.11.7_linux_amd64.tar.gz -o /tmp/alt-pilot-https-test/caddy.tar.gz
+          echo '727b91701a392de6ebc5027509f548bf39979e5216340d0faed8fa5e69c84f8b  /tmp/alt-pilot-https-test/caddy.tar.gz' | sha256sum --check --status
+          tar -xzf /tmp/alt-pilot-https-test/caddy.tar.gz -C /tmp/alt-pilot-https-test caddy
+      - name: Validate real IP ACME challenge, NAT-safe HTTPS, login and restart
+        run: python3 tools/test_https.py --caddy /tmp/alt-pilot-https-test/caddy

@@ -48,6 +48,13 @@ if [[ "$action" != stop && -r /etc/alt-pilot/bedrock-service.conf ]]; then
   fi
 fi
 
+# Persist the user's intent across VM reboots for every account slot.
+if [[ "$action" == stop ]]; then
+  systemctl disable "$unit"
+else
+  systemctl enable "$unit"
+fi
+
 if [[ "$action" == restart ]]; then
   systemctl stop "$unit"
   sleep 2

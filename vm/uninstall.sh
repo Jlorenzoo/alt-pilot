@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # vm/uninstall.sh — remove AFK setup but DO NOT delete the VM itself.
 set -e
-systemctl disable --now alt-pilot-tunnel.service \
+systemctl disable --now alt-pilot-https.service alt-pilot-tunnel.service \
   alt-pilot-control.service alt-pilot-watchdog.timer \
   alt-pilot.service alt-pilot-alt.service 'alt-pilot@*.service' 2>/dev/null || true
-rm -f /etc/systemd/system/alt-pilot.service \
+rm -f /etc/systemd/system/alt-pilot-https.service /etc/systemd/system/alt-pilot.service \
   /etc/systemd/system/alt-pilot-alt.service \
   /etc/systemd/system/alt-pilot-control.service \
   /etc/systemd/system/alt-pilot-tunnel.service \
@@ -31,7 +31,10 @@ rm -f /usr/local/bin/afk-status /usr/local/bin/afk-start \
       /usr/local/sbin/alt-pilot-account-service \
       /usr/local/bin/afk-control-logs \
       /usr/local/sbin/alt-pilot-set-options
-rm -rf /etc/alt-pilot
+rm -rf /etc/alt-pilot /var/lib/alt-pilot /var/lib/alt-pilot-proxy
+rm -f /usr/local/bin/caddy
+userdel -r alt-pilot-proxy 2>/dev/null || true
+userdel -r alt-pilot-build 2>/dev/null || true
 # Remove user + saved Minecraft data (auth tokens live here)
 userdel -r mc 2>/dev/null || true
 userdel -r afk-control 2>/dev/null || true
