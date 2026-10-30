@@ -44,10 +44,10 @@ class BedrockServiceTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 return commands.read_text().splitlines()
             dropin = systemd / 'alt-pilot@4.service.d/bedrock-runtime.conf'
-            self.assertEqual(restart('bedrock'), ['daemon-reload', 'stop alt-pilot@4.service', 'start alt-pilot@4.service'])
+            self.assertEqual(restart('bedrock'), ['daemon-reload', 'enable alt-pilot@4.service', 'stop alt-pilot@4.service', 'start alt-pilot@4.service'])
             self.assertEqual(dropin.read_text(), (config / 'bedrock-service.conf').read_text())
-            self.assertEqual(restart('bedrock'), ['stop alt-pilot@4.service', 'start alt-pilot@4.service'])
-            self.assertEqual(restart('java'), ['daemon-reload', 'stop alt-pilot@4.service', 'start alt-pilot@4.service'])
+            self.assertEqual(restart('bedrock'), ['enable alt-pilot@4.service', 'stop alt-pilot@4.service', 'start alt-pilot@4.service'])
+            self.assertEqual(restart('java'), ['daemon-reload', 'enable alt-pilot@4.service', 'stop alt-pilot@4.service', 'start alt-pilot@4.service'])
             self.assertFalse(dropin.exists())
 
     def test_webrtc_budget_retains_shared_vm_cap_and_interface_discovery(self):

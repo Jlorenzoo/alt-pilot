@@ -20,7 +20,7 @@ This configures your local machine so you can run the ALT Pilot
 desktop app locally on http://127.0.0.1:8765/ with zero hassle.
 
 Examples:
-  ./install.sh 129.151.84.102
+  ./install.sh 203.0.113.10
   ./install.sh my-server.tailnet.ts.net
 
 Requirements:
@@ -56,7 +56,7 @@ if [[ ! -f "$DEFAULT_KEY.pub" ]]; then
   ssh-keygen -y -f "$DEFAULT_KEY" > "$DEFAULT_KEY.pub"
 fi
 
-SSH_OPTIONS=(-i "$DEFAULT_KEY" -o ConnectTimeout=30 -o StrictHostKeyChecking=ask)
+SSH_OPTIONS=(-o IdentitiesOnly=yes -i "$DEFAULT_KEY" -o ConnectTimeout=30 -o StrictHostKeyChecking=ask)
 echo "==> Connecting to your deployment at $TARGET_HOST..."
 ssh "${SSH_OPTIONS[@]}" "ubuntu@$TARGET_HOST" 'echo "SSH access verified."'
 

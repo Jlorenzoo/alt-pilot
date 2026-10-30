@@ -471,7 +471,7 @@ class TaskStore:
             self.tasks.pop(task.id, None)
 
 
-TOKEN_FILE = Path("/etc/alt-pilot/control-token")
+TOKEN_FILE = Path("/var/lib/alt-pilot/control-token")
 
 
 def load_or_create_api_token(token_path: Path | None = None) -> str:

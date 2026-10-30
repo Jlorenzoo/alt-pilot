@@ -7,6 +7,7 @@ import argparse
 import base64
 import hashlib
 import hmac
+import ipaddress
 import json
 import os
 import secrets
@@ -23,8 +24,8 @@ from urllib.parse import parse_qs, urlparse
 import control_center as core
 
 
-PASSWORD_FILE = Path("/etc/alt-pilot/control-password.json")
-SESSIONS_FILE = Path("/etc/alt-pilot/control-sessions.json")
+PASSWORD_FILE = Path("/var/lib/alt-pilot/control-password.json")
+SESSIONS_FILE = Path("/var/lib/alt-pilot/control-sessions.json")
 CLUSTER_FILE = Path("/etc/alt-pilot/cluster.json")
 PEER_KEY = Path("/etc/alt-pilot/peer_ed25519")
 PEER_KNOWN_HOSTS = Path("/etc/alt-pilot/peer_known_hosts")
@@ -32,6 +33,7 @@ core.HOSTS_FILE = CLUSTER_FILE
 SESSIONS: dict[str, float] = {}
 FAILURES: dict[str, list[float]] = {}
 SESSION_LOCK = threading.RLock()
+LOGIN_HASH_LIMIT = threading.BoundedSemaphore(2)
 SESSION_DAYS = int(os.environ.get("AFK_SESSION_DAYS", "30"))
 SESSION_SECONDS = SESSION_DAYS * 24 * 60 * 60
 PUBLIC_PATHS = {"/login.css", "/icon.svg", "/brand-lockup.svg", "/favicon.ico"}
@@ -59,26 +61,19 @@ def _load_sessions() -> None:
 
 
 def _save_sessions() -> None:
+    temporary = None
     try:
-        SESSIONS_FILE.parent.mkdir(parents=True, exist_ok=True)
-        temporary = SESSIONS_FILE.with_suffix(".json.tmp")
         with SESSION_LOCK:
             payload = json.dumps(SESSIONS) + "\n"
-        try:
-            fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o660)
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(payload)
-            try:
-                os.chmod(temporary, 0o660)
-            except OSError:
-                pass
-            os.replace(temporary, SESSIONS_FILE)
-        except PermissionError:
-            fd = os.open(SESSIONS_FILE, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o660)
-            with os.fdopen(fd, "w", encoding="utf-8") as handle:
-                handle.write(payload)
-    except Exception:
-        pass
+        fd, temporary = tempfile.mkstemp(prefix=".sessions-", dir=SESSIONS_FILE.parent)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+        os.replace(temporary, SESSIONS_FILE)
+    except OSError:
+        print("Session persistence is unavailable; check the private runtime directory permissions.")
+    finally:
+        if temporary:
+            Path(temporary).unlink(missing_ok=True)
 
 
 _load_sessions()
@@ -521,16 +516,23 @@ def verify_password(value: str) -> bool:
     record = password_record()
     salt = base64.b64decode(record["salt"])
     expected = base64.b64decode(record["hash"])
-    actual = hashlib.scrypt(value.encode(), salt=salt, n=16384, r=8, p=1, dklen=32)
+    # Bound the expensive memory allocations independently of HTTP workers.
+    with LOGIN_HASH_LIMIT:
+        actual = hashlib.scrypt(value.encode(), salt=salt, n=16384, r=8, p=1, dklen=32)
     return hmac.compare_digest(actual, expected)
 
 
 def client_key(handler: core.Handler) -> str:
-    # Both supported tunnels connect from loopback. Request headers are not a
-    # trusted identity: Tailscale does not promise to overwrite Cloudflare's
-    # header, so accepting it lets a caller choose a new rate-limit bucket.
-    # The bound is deliberately shared by all users of this control endpoint.
-    return handler.client_address[0]
+    peer = handler.client_address[0]
+    # Only the installer-configured local HTTPS proxy is trusted. Its config
+    # overwrites this custom header, so internet callers cannot pick a bucket.
+    # Funnel mode leaves this trust disabled and retains the shared limit.
+    if peer in ("127.0.0.1", "::1") and os.environ.get("AFK_TRUST_LOCAL_PROXY") == "1":
+        try:
+            return str(ipaddress.ip_address(handler.headers.get("X-Alt-Pilot-Client-IP", "")))
+        except ValueError:
+            pass
+    return peer
 
 
 class RemoteHandler(core.Handler):
@@ -714,18 +716,13 @@ def write_password(password: str) -> None:
     salt = secrets.token_bytes(16)
     digest = hashlib.scrypt(password.encode(), salt=salt, n=16384, r=8, p=1, dklen=32)
     record = {"version": 1, "salt": base64.b64encode(salt).decode(), "hash": base64.b64encode(digest).decode()}
-    temporary = PASSWORD_FILE.with_suffix(".json.tmp")
-    fd = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o660)
-    with os.fdopen(fd, "w", encoding="utf-8") as handle:
-        handle.write(json.dumps(record) + "\n")
+    fd, temporary = tempfile.mkstemp(prefix=".password-", dir=PASSWORD_FILE.parent)
     try:
-        os.chmod(temporary, 0o660)
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(json.dumps(record) + "\n")
         os.replace(temporary, PASSWORD_FILE)
-    except PermissionError:
-        # During an in-app rotation the restricted process has group write
-        # access but deliberately cannot change ownership or mode bits.
-        temporary.unlink(missing_ok=True)
-        raise RuntimeError("Password file permissions do not allow a safe update.")
+    finally:
+        Path(temporary).unlink(missing_ok=True)
 
 
 def init_password() -> str:
@@ -749,7 +746,7 @@ def run_server(port: int) -> None:
     core.remote_probe = health
     core.local_summary = remote_summary
     core.console_history = local_console_history
-    core.start_availability(Path("/etc/alt-pilot/availability.sqlite3"), lambda: health(fresh=True))
+    core.start_availability(Path("/var/lib/alt-pilot/availability.sqlite3"), lambda: health(fresh=True))
     _load_sessions()
     _start_session_janitor()
     import chat_whitelist

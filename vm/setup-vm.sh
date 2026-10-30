@@ -16,9 +16,13 @@ SETUP_VM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SETUP_VM_DIR/../lib/common.sh"
 
 require_root
+# Keep account runtimes running, but stop the controller before safely migrating
+# its private password/session/SQLite state during a repair.
+systemctl stop alt-pilot-control.service 2>/dev/null || true
 export OPTIONS_FILE="${OPTIONS_FILE:-/etc/alt-pilot/options.env}"
 AFK_HOST_ROLE="${AFK_HOST_ROLE:-primary}"
-TAILSCALE_ACCESS=false
+AFK_REMOTE_ACCESS="${AFK_REMOTE_ACCESS:-ip}"
+[[ "$AFK_REMOTE_ACCESS" == ip || "$AFK_REMOTE_ACCESS" == funnel || "$AFK_REMOTE_ACCESS" == none ]] || die "AFK_REMOTE_ACCESS must be ip, funnel or none."
 [[ "$AFK_HOST_ROLE" == primary || "$AFK_HOST_ROLE" == worker ]] \
   || die "AFK_HOST_ROLE must be primary or worker."
 
@@ -79,6 +83,14 @@ ufw default deny incoming >/dev/null
 ufw default allow outgoing >/dev/null
 ufw limit 22/tcp >/dev/null
 ufw --force enable >/dev/null
+# Oracle Ubuntu images can also restore vendor iptables rules at boot. Apply
+# UFW after that restore so the app's HTTPS allowances survive a VM restart.
+install -d -m 755 /etc/systemd/system/ufw.service.d
+cat > /etc/systemd/system/ufw.service.d/alt-pilot.conf <<'FIREWALL'
+[Unit]
+After=netfilter-persistent.service
+FIREWALL
+systemctl enable ufw.service >/dev/null
 ok "UFW: inbound denied, SSH rate-limited, outbound allowed"
 
 # Enforce the SSH posture required by the dashboard rather than inheriting
@@ -93,8 +105,9 @@ MaxAuthTries 3
 LoginGraceTime 30
 X11Forwarding no
 EOF
+install -d -m 755 /run/sshd
 sshd -t
-systemctl reload ssh 2>/dev/null || systemctl reload sshd
+systemctl reload-or-restart ssh 2>/dev/null || systemctl reload-or-restart sshd
 ok "SSH: root and password login disabled; connection attempts constrained"
 
 # ---------- 2. User ----------
@@ -110,8 +123,21 @@ if ! id -u afk-control >/dev/null 2>&1; then
   ok "Restricted remote-control user created"
 fi
 mkdir -p /opt/alt-pilot/{logs,run,assets} /etc/alt-pilot
-chown root:afk-control /etc/alt-pilot
-chmod 775 /etc/alt-pilot
+# Configuration consumed by privileged helpers is never dashboard-writable.
+chown root:root /etc/alt-pilot
+chmod 755 /etc/alt-pilot
+[[ ! -L /var/lib/alt-pilot ]] || die "Private runtime directory must not be a symlink."
+install -d -o root -g afk-control -m 700 /var/lib/alt-pilot
+for name in control-password.json control-sessions.json control-token; do
+  [[ ! -L "/var/lib/alt-pilot/$name" ]] || die "Private runtime state must not contain symlinks."
+done
+# Migrate old mutable state without following attacker-controlled links.
+for name in control-password.json control-sessions.json availability.sqlite3 control-token; do
+  if [[ -f "/etc/alt-pilot/$name" && ! -L "/etc/alt-pilot/$name" && ! -e "/var/lib/alt-pilot/$name" ]]; then
+    install -o afk-control -g afk-control -m 600 "/etc/alt-pilot/$name" "/var/lib/alt-pilot/$name"
+    rm -f "/etc/alt-pilot/$name"
+  fi
+done
 mkdir -p /home/mc/slots/1/game
 # The game process must not be able to replace the control service or runtimes.
 # In particular, never recursively transfer this tree to the untrusted mc user
@@ -120,7 +146,7 @@ mkdir -p /home/mc/slots/1/game
 chown -hR root:mc /opt/alt-pilot
 chmod -R go-w /opt/alt-pilot
 chown -R mc:mc /home/mc/slots
-chmod 750 /opt/alt-pilot
+chmod 751 /opt/alt-pilot
 if [[ ! -f /etc/alt-pilot/options.env ]]; then
   cat > /etc/alt-pilot/options.env <<'EOF'
 MC_VERSION=1.12.2
@@ -278,40 +304,29 @@ EOF
   chmod 440 /etc/sudoers.d/alt-pilot-control
   visudo -cf /etc/sudoers.d/alt-pilot-control >/dev/null
 
-  if [[ ! -s /etc/alt-pilot/control-password.json ]]; then
+  if [[ ! -s /var/lib/alt-pilot/control-password.json ]]; then
     (cd "$CONTROL_DIR" && python3 remote_control.py --init-password) > /opt/alt-pilot/initial-control-password
     chmod 600 /opt/alt-pilot/initial-control-password
   fi
-  chown root:afk-control /etc/alt-pilot/control-password.json
+  chown root:afk-control /var/lib/alt-pilot/control-password.json
   # The restricted control process owns password rotation; the file contains
   # only a salted scrypt hash, never the plaintext password.
-  chmod 660 /etc/alt-pilot/control-password.json
-  touch /etc/alt-pilot/control-sessions.json
-  chown root:afk-control /etc/alt-pilot/control-sessions.json
-  chmod 660 /etc/alt-pilot/control-sessions.json
+  chmod 660 /var/lib/alt-pilot/control-password.json
+  touch /var/lib/alt-pilot/control-sessions.json
+  chown root:afk-control /var/lib/alt-pilot/control-sessions.json
+  chmod 660 /var/lib/alt-pilot/control-sessions.json
 
-  if command -v tailscale >/dev/null 2>&1 \
-      && systemctl is-active --quiet tailscaled.service \
-      && tailscale funnel status --json 2>/dev/null \
-        | jq -e '(.Web // {}) | to_entries | any(.value.Handlers // {} | to_entries | any(.value.Proxy == "http://127.0.0.1:8765"))' >/dev/null; then
-    TAILSCALE_ACCESS=true
-    ok "Existing stable Tailscale Funnel will publish the control center"
-  elif ! command -v cloudflared >/dev/null 2>&1; then
-    # Deliberately pinned. Update this version and checksum together after
-    # reviewing Cloudflare's release notes and published checksum.
-    CF_VERSION="2026.8.3"
-    CF_SHA256="f29324fe934d1e100617484c78deef803c4dc2cd351d645bbde42e96b4fccc5e"
-    CF_URL="https://github.com/cloudflare/cloudflared/releases/download/${CF_VERSION}/cloudflared-linux-amd64"
-    info "Installing verified cloudflared ${CF_VERSION} x86-64 binary"
-    CF_DOWNLOAD="$(mktemp)"
-    curl -fsSL "$CF_URL" -o "$CF_DOWNLOAD"
-    printf '%s  %s\n' "$CF_SHA256" "$CF_DOWNLOAD" | sha256sum --check --status \
-      || die "cloudflared checksum mismatch"
-    install -o root -g root -m 755 "$CF_DOWNLOAD" /usr/local/bin/cloudflared
-    rm -f "$CF_DOWNLOAD"
-    # The marker lets uninstall remove only a binary installed by this project.
-    touch /etc/alt-pilot/cloudflared-installed-by-afk
+  chown -hR afk-control:afk-control /var/lib/alt-pilot
+  chmod 770 /var/lib/alt-pilot
+  if [[ "$AFK_REMOTE_ACCESS" == funnel ]]; then
+    printf 'AFK_TRUST_LOCAL_PROXY=0\n' > /etc/alt-pilot/proxy.env
+    rm -f /etc/alt-pilot/dashboard-url
+    systemctl disable --now alt-pilot-https.service alt-pilot-firewall.service 2>/dev/null || true
+    bash "$SETUP_VM_DIR/install-tailscale.sh"
+  elif [[ "$AFK_REMOTE_ACCESS" == ip ]]; then
+    bash "$SETUP_VM_DIR/install-https.sh"
   fi
+
 fi
 
 systemctl daemon-reload
@@ -320,22 +335,19 @@ if [[ "$AFK_HOST_ROLE" == primary ]]; then
   if [[ -s /etc/alt-pilot/cluster.json ]]; then
     local_host_id="$(jq -r '.hosts[] | select(.local == true) | .id' /etc/alt-pilot/cluster.json | head -n 1)"
     slot_one_host="$(jq -r '.placements["1"] // ""' /etc/alt-pilot/cluster.json)"
-    if [[ -n "$local_host_id" && "$slot_one_host" == "$local_host_id" ]]; then
-      systemctl enable alt-pilot.service
-    else
+    if [[ -z "$local_host_id" || "$slot_one_host" != "$local_host_id" ]]; then
       # Do not stop a live session during a repair install; only prevent the
       # unassigned legacy slot from returning on the next VM boot.
       systemctl disable alt-pilot.service 2>/dev/null || true
     fi
-  else
-    systemctl enable alt-pilot.service
+  elif [[ ! -s /home/mc/slots/1/mcc/SessionCache.db && ! -s /home/mc/slots/1/account.json ]]; then
+    systemctl disable alt-pilot.service 2>/dev/null || true
   fi
+  # Signed-in accounts retain their prior enabled/stopped choice on repair.
+  # Start/Stop in the dashboard manages persistence through the gateway.
   systemctl restart alt-pilot-control.service alt-pilot-watchdog.timer
-  if [[ "$TAILSCALE_ACCESS" == true ]]; then
-    systemctl disable --now alt-pilot-tunnel.service 2>/dev/null || true
-  else
-    systemctl enable --now alt-pilot-tunnel.service
-  fi
+  # Never substitute a temporary public link for the configured HTTPS endpoint.
+  systemctl disable --now alt-pilot-tunnel.service 2>/dev/null || true
   ok "Minecraft service and protected remote control enabled"
 else
   systemctl disable --now alt-pilot.service alt-pilot-control.service alt-pilot-tunnel.service 2>/dev/null || true
