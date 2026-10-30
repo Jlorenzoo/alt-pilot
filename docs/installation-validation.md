@@ -8,6 +8,8 @@ policy statements themselves.
 
 ## Tested
 
+- The complete shell setup path was exercised with strict fake OCI/SSH endpoints,
+  including a second run that reuses the same VM and a backup that excludes keys.
 - Oracle profile/home-region discovery, account-wide compartment/storage
   enumeration and CLI request schemas were checked read-only against OCI.
 - A real disposable Ubuntu 22.04 VM installed Java/MCC, native Bedrock/WebRTC,
@@ -22,7 +24,7 @@ policy statements themselves.
   private NAT and a client that sends no SNI, matching the important Oracle case.
 - Production configuration uses Let's Encrypt's public `shortlived` profile.
   The local test CA and its fixtures are not part of installed configuration.
-- 168 Python tests, 90 Bedrock tests and 20 browser-logic tests passed locally.
+- 169 Python tests, 90 Bedrock tests and 20 browser-logic tests passed locally.
   The CI workflow independently repeats regression tests, a fresh Ubuntu install
   and repair, and the IP HTTPS/ACME test. The security workflow scans history and
   audits production dependencies; the local npm audit reported zero advisories.

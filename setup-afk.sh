@@ -152,9 +152,6 @@ EOF
   exit 0
 fi
 
-# Keep retries idempotent even if Oracle accepts launch before the CLI is interrupted.
-if [[ ! -s "$STATE_DIR/launch-token" ]]; then python3 -c 'import uuid; print(uuid.uuid4())' > "$STATE_DIR/launch-token"; fi
-export VM_LAUNCH_RETRY_TOKEN="$(cat "$STATE_DIR/launch-token")"
 if [[ -z "${SSH_SOURCE_CIDR:-}" ]]; then
   SSH_SOURCE_CIDR="$(curl --connect-timeout 10 --max-time 20 -fsS https://api.ipify.org | python3 -c 'import ipaddress,sys; ip=ipaddress.IPv4Address(sys.stdin.read().strip()); ip.is_global or sys.exit(1); print(str(ip)+"/32")')" || die "Cannot identify this Cloud Shell address. Check its internet access and run the installer again."
 fi

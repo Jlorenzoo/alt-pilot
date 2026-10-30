@@ -216,7 +216,6 @@ launch_vm() {
     --compartment-id "$compartment" \
     --display-name "$name" \
     --shape "VM.Standard.E2.1.Micro" \
-    --opc-retry-token "${VM_LAUNCH_RETRY_TOKEN:?Launch retry token is required}" \
     --freeform-tags '{"alt-pilot":"managed"}' \
     --source-details "$(jq -n --arg id "$image" '{sourceType:"image",imageId:$id,bootVolumeSizeInGBs:50}')" \
     --subnet-id "$subnet" \
