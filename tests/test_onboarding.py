@@ -165,3 +165,34 @@ if args[0] in ('start','stop'): (base/'active').write_text('yes' if args[0]=='st
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual((folder / 'enabled').read_text(), expected)
                 self.assertEqual((folder / 'active').read_text(), expected)
+
+
+class OracleFirewallTests(unittest.TestCase):
+    def test_web_rules_precede_vendor_reject_and_cleanup_preserves_vendor_rules(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            state = folder / 'rules.json'
+            state.write_text(json.dumps([['vendor-reject']]))
+            executable = folder / 'iptables'
+            executable.write_text('''#!/usr/bin/env python3
+import json,os,pathlib,sys
+args=[a for a in sys.argv[1:] if a!='-w'];p=pathlib.Path(os.environ['RULES_FILE']);rules=json.loads(p.read_text())
+if args[0]=='-S': print('-P INPUT DROP');sys.exit(0)
+if args[0]=='-C':sys.exit(0 if args[2:] in rules else 1)
+if args[0]=='-I':
+ assert args[1:3]==['INPUT','1'];rules.insert(0,args[3:])
+elif args[0]=='-D':rules.remove(args[2:])
+else:raise SystemExit('Must not flush or replace vendor rules')
+p.write_text(json.dumps(rules))
+''')
+            executable.chmod(0o755)
+            env = dict(os.environ, PATH=str(folder)+os.pathsep+os.environ['PATH'], RULES_FILE=str(state))
+            root = Path(__file__).resolve().parents[1]
+            for _ in range(2):
+                subprocess.run(['bash', str(root/'bin/alt-pilot-firewall'), 'start'], check=True, env=env)
+            rules = json.loads(state.read_text())
+            self.assertEqual(len(rules), 3)
+            self.assertEqual(rules[-1], ['vendor-reject'])
+            self.assertEqual({rule[rule.index('--dport')+1] for rule in rules[:2]}, {'80','443'})
+            subprocess.run(['bash', str(root/'bin/alt-pilot-firewall'), 'stop'], check=True, env=env)
+            self.assertEqual(json.loads(state.read_text()), [['vendor-reject']])

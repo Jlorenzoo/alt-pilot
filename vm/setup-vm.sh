@@ -321,7 +321,7 @@ EOF
   if [[ "$AFK_REMOTE_ACCESS" == funnel ]]; then
     printf 'AFK_TRUST_LOCAL_PROXY=0\n' > /etc/alt-pilot/proxy.env
     rm -f /etc/alt-pilot/dashboard-url
-    systemctl disable --now alt-pilot-https.service 2>/dev/null || true
+    systemctl disable --now alt-pilot-https.service alt-pilot-firewall.service 2>/dev/null || true
     bash "$SETUP_VM_DIR/install-tailscale.sh"
   elif [[ "$AFK_REMOTE_ACCESS" == ip ]]; then
     bash "$SETUP_VM_DIR/install-https.sh"

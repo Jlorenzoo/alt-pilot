@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # vm/uninstall.sh — remove AFK setup but DO NOT delete the VM itself.
 set -e
-systemctl disable --now alt-pilot-https.service alt-pilot-tunnel.service \
+systemctl disable --now alt-pilot-firewall.service alt-pilot-https.service alt-pilot-tunnel.service \
   alt-pilot-control.service alt-pilot-watchdog.timer \
   alt-pilot.service alt-pilot-alt.service 'alt-pilot@*.service' 2>/dev/null || true
-rm -f /etc/systemd/system/alt-pilot-https.service /etc/systemd/system/alt-pilot.service \
+rm -f /etc/systemd/system/alt-pilot-firewall.service /usr/local/sbin/alt-pilot-firewall /etc/systemd/system/alt-pilot-https.service /etc/systemd/system/alt-pilot.service \
   /etc/systemd/system/alt-pilot-alt.service \
   /etc/systemd/system/alt-pilot-control.service \
   /etc/systemd/system/alt-pilot-tunnel.service \

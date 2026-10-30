@@ -18,13 +18,16 @@ policy statements themselves.
 - Real controller requests checked password login, protected APIs, cookie flags,
   settings writes as `mc`, refusal to start unsigned accounts, password rotation,
   session invalidation and unprivileged runtime loading.
+- Oracle-style pre-existing INPUT reject rules were reproduced in the VM. The
+  app's narrowly scoped web-port helper restored HTTPS access without flushing
+  vendor rules. Its boot unit runs after both firewall managers.
 - Caddy obtained an IP-address certificate from an isolated Pebble ACME CA using
   real TLS-ALPN validation. HTTPS login, protected APIs and certificate reuse after
   proxy restart passed with a trusted client. The test also emulates public-to-
   private NAT and a client that sends no SNI, matching the important Oracle case.
 - Production configuration uses Let's Encrypt's public `shortlived` profile.
   The local test CA and its fixtures are not part of installed configuration.
-- 169 Python tests, 90 Bedrock tests and 20 browser-logic tests passed locally.
+- 170 Python tests, 90 Bedrock tests and 20 browser-logic tests passed locally.
   The CI workflow independently repeats regression tests, a fresh Ubuntu install
   and repair, and the IP HTTPS/ACME test. The security workflow scans history and
   audits production dependencies; the local npm audit reported zero advisories.

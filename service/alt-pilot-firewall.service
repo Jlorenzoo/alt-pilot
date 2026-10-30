@@ -1,0 +1,17 @@
+[Unit]
+Description=ALT Pilot web ports ahead of Oracle vendor firewall rejects
+After=network-pre.target ufw.service netfilter-persistent.service
+Before=alt-pilot-https.service
+[Service]
+Type=oneshot
+RemainAfterExit=true
+ExecStart=/usr/local/sbin/alt-pilot-firewall start
+ExecStop=/usr/local/sbin/alt-pilot-firewall stop
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+CapabilityBoundingSet=CAP_NET_ADMIN CAP_NET_RAW
+RestrictAddressFamilies=AF_UNIX AF_NETLINK AF_INET AF_INET6
+[Install]
+WantedBy=multi-user.target

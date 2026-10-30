@@ -40,8 +40,9 @@ chmod 644 /etc/alt-pilot/Caddyfile
 cat > /etc/systemd/system/alt-pilot-https.service <<'UNIT'
 [Unit]
 Description=ALT Pilot HTTPS dashboard with automatic certificate renewal
-After=network-online.target alt-pilot-control.service
+After=network-online.target alt-pilot-control.service alt-pilot-firewall.service
 Wants=network-online.target alt-pilot-control.service
+Requires=alt-pilot-firewall.service
 [Service]
 User=alt-pilot-proxy
 Group=alt-pilot-proxy
@@ -72,6 +73,10 @@ printf 'https://%s\n' "$ip" > /etc/alt-pilot/dashboard-url
 chmod 644 /etc/alt-pilot/dashboard-url
 ufw allow 80/tcp >/dev/null
 ufw allow 443/tcp >/dev/null
+install -o root -g root -m 755 "$(dirname "$0")/../bin/alt-pilot-firewall" /usr/local/sbin/alt-pilot-firewall
+install -o root -g root -m 644 "$(dirname "$0")/../service/alt-pilot-firewall.service" /etc/systemd/system/alt-pilot-firewall.service
 systemctl daemon-reload
+systemctl enable --now alt-pilot-firewall.service
+systemctl restart alt-pilot-firewall.service
 systemctl enable --now alt-pilot-https.service
 systemctl restart alt-pilot-https.service

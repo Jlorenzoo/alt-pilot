@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# Preserve vendor rules; add only the app's web ports before blanket rejects.
+set -Eeuo pipefail
+mode="${1:-start}"
+[[ "$mode" == start || "$mode" == stop ]] || exit 2
+for backend in iptables ip6tables iptables-legacy ip6tables-legacy; do
+  command -v "$backend" >/dev/null 2>&1 || continue
+  "$backend" -w -S INPUT >/dev/null 2>&1 || continue
+  for port in 80 443; do
+    rule=(-p tcp --dport "$port" -m comment --comment alt-pilot-https -j ACCEPT)
+    if [[ "$mode" == start ]]; then
+      if ! "$backend" -w -C INPUT "${rule[@]}" 2>/dev/null; then
+        "$backend" -w -I INPUT 1 "${rule[@]}"
+      fi
+    else
+      while "$backend" -w -C INPUT "${rule[@]}" 2>/dev/null; do
+        "$backend" -w -D INPUT "${rule[@]}"
+      done
+    fi
+  done
+done
