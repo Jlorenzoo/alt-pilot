@@ -20,7 +20,7 @@ server, private history, credential, player whitelist, or telemetry is inherited
 - [x] Test first install, repair, privileges, login and service recovery in a clean
       disposable Ubuntu VM; keep production Minecraft sessions untouched.
 - [x] Run secrets, dependency, static analysis and regression checks in GitHub CI.
-- [ ] Publish the updated installer through a reviewed PR after checks pass; keep GitHub security protections enabled.
+- [x] Publish the updated installer through a reviewed PR after checks pass; keep GitHub security protections enabled.
 - [x] Deliver the teammate guide with setup, Microsoft sign-in, troubleshooting,
       updates, cost limits, privacy, and removal instructions.
 

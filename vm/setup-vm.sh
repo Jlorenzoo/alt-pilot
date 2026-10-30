@@ -83,6 +83,14 @@ ufw default deny incoming >/dev/null
 ufw default allow outgoing >/dev/null
 ufw limit 22/tcp >/dev/null
 ufw --force enable >/dev/null
+# Oracle Ubuntu images can also restore vendor iptables rules at boot. Apply
+# UFW after that restore so the app's HTTPS allowances survive a VM restart.
+install -d -m 755 /etc/systemd/system/ufw.service.d
+cat > /etc/systemd/system/ufw.service.d/alt-pilot.conf <<'FIREWALL'
+[Unit]
+After=netfilter-persistent.service
+FIREWALL
+systemctl enable ufw.service >/dev/null
 ok "UFW: inbound denied, SSH rate-limited, outbound allowed"
 
 # Enforce the SSH posture required by the dashboard rather than inheriting
