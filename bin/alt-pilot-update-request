@@ -1,0 +1,5 @@
+#!/usr/bin/env bash
+# The dashboard may queue this unit, with no caller-controlled arguments.
+set -Eeuo pipefail
+[[ $# -eq 0 ]] || exit 2
+exec systemctl --no-ask-password start --no-block alt-pilot-update.service

@@ -296,10 +296,12 @@ if [[ "$AFK_HOST_ROLE" == primary ]]; then
   cp -a "$SETUP_VM_DIR/../web/." "$CONTROL_DIR/web/"
   chown -R root:root "$CONTROL_DIR/web"
   chmod -R a+rX "$CONTROL_DIR/web"
+  bash "$SETUP_VM_DIR/install-updater.sh"
 
   cat > /etc/sudoers.d/alt-pilot-control <<'EOF'
 afk-control ALL=(root) NOPASSWD: /usr/local/sbin/alt-pilot-account-service *, /usr/local/bin/afk-health-json, /usr/local/bin/afk-control-logs, /usr/local/bin/afk-console-log *, /usr/local/sbin/alt-pilot-set-options *, /usr/local/sbin/alt-pilot-set-account-options *, /usr/local/sbin/alt-pilot-send *, /usr/local/sbin/alt-pilot-chat-inbox *
 afk-control ALL=(mc) NOPASSWD: /usr/local/bin/mc-login, /usr/local/bin/mc-signout
+afk-control ALL=(root) NOPASSWD: /usr/local/sbin/alt-pilot-update-request ""
 EOF
   chmod 440 /etc/sudoers.d/alt-pilot-control
   visudo -cf /etc/sudoers.d/alt-pilot-control >/dev/null
