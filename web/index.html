@@ -7,7 +7,7 @@
   <title>ALT Pilot — 24/7 MC-alts</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/styles.css?v=20261029sharedaccounts1">
+  <link rel="stylesheet" href="/styles.css?v=20261121headerupdate">
   <link rel="stylesheet" href="/workspace.css?v=20261029sharedaccounts1">
 </head>
 <body>
@@ -127,6 +127,13 @@
           <div class="mobile-lang-switcher" id="mobileLangSwitcher" role="radiogroup" aria-label="Language selection">
             <button type="button" class="lang-btn active" data-lang="en" role="radio" aria-checked="true">EN</button>
             <button type="button" class="lang-btn" data-lang="it" role="radio" aria-checked="false">IT</button>
+          </div>
+          <div id="updatePanel" class="topbar-update hidden">
+            <button id="updateButton" class="button topbar-update-button" type="button" title="Install latest update" aria-label="Install latest update" data-i18n-title="update_install" data-i18n-aria="update_install">
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 3h2v10.2l3.6-3.6L18 11l-6 6-6-6 1.4-1.4 3.6 3.6V3ZM4 16h2v3h12v-3h2v5H4v-5Z"/></svg>
+              <span data-i18n="update_button">Update</span>
+            </button>
+            <p id="updateMessage" class="topbar-update-status" role="status"></p>
           </div>
           <div id="topbarPower" class="topbar-power">
             <button class="icon-button client-power" data-action="start" id="primaryControl" title="Start client" aria-label="Start client" data-i18n-title="topbar_start_client" data-i18n-aria="topbar_start_client">
@@ -628,10 +635,6 @@
                     </div>
                     <div class="password-actions"><p id="passwordMessage" data-i18n="settings_password_msg_default">Existing signed-in sessions stay active.</p><button id="changePasswordButton" class="button secondary" type="button" data-i18n="settings_change_password_btn">Change password</button></div>
                   </section>
-                  <section id="updatePanel" class="panel form-panel remote-access-panel hidden">
-                    <div class="panel-heading"><div><h3 data-i18n="update_title">Software update</h3></div></div>
-                    <div class="password-actions"><p id="updateMessage" role="status"></p><button id="updateButton" class="button secondary" type="button" data-i18n="update_install">Install latest update</button></div>
-                  </section>
                   <div id="remoteUnavailable" class="settings-empty hidden"><strong data-i18n="settings_remote_unavailable_title">Remote access is not set up</strong><p data-i18n="settings_remote_unavailable_desc">Complete the secure install in Account setup to create a public control link.</p></div>
                 </section>
                 <div class="form-actions" id="settingsSaveActions"><p id="settingsMessage" data-i18n="settings_save_msg">Changes take effect after the next client restart.</p><button class="button primary" id="settingsSaveBtn" type="button" data-i18n="settings_save_btn">Save</button></div>
@@ -795,8 +798,8 @@
   </div>
 
   <script src="/console-format.js?v=8"></script>
-  <script src="/i18n.js?v=20261121update1"></script>
-  <script src="/app.js?v=20261121update1"></script>
+  <script src="/i18n.js?v=20261121headerupdate"></script>
+  <script src="/app.js?v=20261121headerupdate"></script>
   <script src="/availability.js?v=20261029sharedaccounts1"></script>
 </body>
 </html>
