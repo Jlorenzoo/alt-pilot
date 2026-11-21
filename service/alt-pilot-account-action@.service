@@ -1,0 +1,7 @@
+[Unit]
+Description=ALT Pilot account action %i
+
+[Service]
+Type=oneshot
+TimeoutStartSec=40
+ExecStart=/usr/bin/flock -w 3 /run/alt-pilot-account-action.lock /usr/local/libexec/alt-pilot-account-action %i

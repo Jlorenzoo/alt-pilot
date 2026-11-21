@@ -234,7 +234,7 @@ install -m 755 "$SETUP_VM_DIR/../bin/afk-console-log" /usr/local/bin/afk-console
 install -m 755 "$SETUP_VM_DIR/../bin/mc-login" /usr/local/bin/mc-login
 install -m 755 "$SETUP_VM_DIR/../bin/mc-signout" /usr/local/bin/mc-signout
 install -m 755 "$SETUP_VM_DIR/../bin/alt-pilot-mcc-prepare" /usr/local/bin/alt-pilot-mcc-prepare
-install -m 755 "$SETUP_VM_DIR/../bin/alt-pilot-account-service" /usr/local/sbin/alt-pilot-account-service
+bash "$SETUP_VM_DIR/install-account-controls.sh"
 install -m 755 "$SETUP_VM_DIR/../bin/alt-pilot-set-options" /usr/local/sbin/alt-pilot-set-options
 install -m 755 "$SETUP_VM_DIR/../bin/alt-pilot-set-account-options" /usr/local/sbin/alt-pilot-set-account-options
 install -m 755 "$SETUP_VM_DIR/../bin/alt-pilot-send" /usr/local/sbin/alt-pilot-send

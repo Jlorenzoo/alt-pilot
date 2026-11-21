@@ -64,6 +64,9 @@ def main():
             time.sleep(0.25)
         raise RuntimeError('Dashboard action did not finish.')
 
+    slot_unit = 'alt-pilot@10.service'
+    test_dropin = Path(f'/run/systemd/system/{slot_unit}.d/smoke.conf')
+    bedrock_dropin = Path(f'/etc/systemd/system/{slot_unit}.d/bedrock-runtime.conf')
     try:
         task = action({'action': 'save_account_settings', 'slot': 10, 'startup_command_enabled': False,
                        'tpa_auto_accept': False, 'tpa_whitelist': 'FixturePlayer', 'startup_delay': 5})
@@ -73,8 +76,25 @@ def main():
                 'Settings were not written as the game user.')
         task = action({'action': 'start', 'slot': 10})
         require(task['state'] == 'failed', 'An unsigned account was allowed to start.')
+        # Exercise the real dashboard sandbox without a Minecraft connection.
+        test_dropin.parent.mkdir(parents=True)
+        test_dropin.write_text('[Service]\nExecStart=\nExecStart=/usr/bin/sleep infinity\n')
+        (slots / '10/account.json').write_text(json.dumps({'edition': 'bedrock', 'xuid': '1', 'name': 'Fixture'}))
+        subprocess.run(['systemctl', 'daemon-reload'], check=True)
+        task = action({'action': 'start', 'slot': 10})
+        require(task['state'] == 'succeeded', f'Bedrock account control failed: {task}')
+        require(bedrock_dropin.is_file(), 'Bedrock settings were not applied outside the dashboard sandbox.')
+        subprocess.run(['systemctl', 'is-active', '--quiet', slot_unit], check=True)
+        task = action({'action': 'stop', 'slot': 10})
+        require(task['state'] == 'succeeded', f'Bedrock account stop failed: {task}')
     finally:
         import shutil
+        subprocess.run(['systemctl', 'disable', '--now', slot_unit], check=False)
+        bedrock_dropin.unlink(missing_ok=True)
+        if test_dropin.exists():
+            test_dropin.unlink()
+            test_dropin.parent.rmdir()
+        subprocess.run(['systemctl', 'daemon-reload'], check=True)
         # This slot has no identity or token: it was created only by this test.
         shutil.rmtree(slots / '10', ignore_errors=True)
 

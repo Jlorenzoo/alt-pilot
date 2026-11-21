@@ -47,6 +47,19 @@ If setup was interrupted, run the original command again. It resumes your saved
 VM rather than creating another one. Your saved Minecraft sign-ins are retained
 when repairing the app.
 
+## Repair account Start and Stop
+
+If the dashboard reports a read-only filesystem when starting an account,
+paste this command into the Oracle Cloud Shell you used for setup.
+
+```bash
+repair=$(curl -fsSL https://raw.githubusercontent.com/Jlorenzoo/alt-pilot/main/setup-cloudshell.sh) && bash -c "$repair" -- --repair-accounts
+```
+
+When it says **ALT Pilot account controls repaired**, refresh the dashboard
+and click **Start** on the affected account. Your sign-ins and running accounts
+are kept.
+
 ## Cost and capacity
 
 The installer selects one Always Free-eligible E2 Micro and a 50 GB boot disk in
