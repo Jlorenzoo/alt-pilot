@@ -85,6 +85,14 @@ def main():
         require(task['state'] == 'succeeded', f'Bedrock account control failed: {task}')
         require(bedrock_dropin.is_file(), 'Bedrock settings were not applied outside the dashboard sandbox.')
         subprocess.run(['systemctl', 'is-active', '--quiet', slot_unit], check=True)
+        pid = int(subprocess.check_output(['systemctl', 'show', '-p', 'MainPID', '--value', slot_unit]))
+        bedrock_status = slots / '10/bedrock/status.json'
+        bedrock_status.parent.mkdir(exist_ok=True)
+        bedrock_status.write_text(json.dumps({'pid': pid, 'connected': True, 'updated': int(time.time())}))
+        subprocess.run(['systemctl', 'start', 'alt-pilot-watchdog.service'], check=True)
+        runtime = Path('/run/alt-pilot-watchdog')
+        require(any((runtime / f'{marker}-10').is_file() for marker in ('candidate', 'connected')),
+                'Watchdog failed to write connection recovery state in its sandbox.')
         task = action({'action': 'stop', 'slot': 10})
         require(task['state'] == 'succeeded', f'Bedrock account stop failed: {task}')
     finally:

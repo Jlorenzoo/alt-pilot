@@ -74,6 +74,11 @@ that can run together depends on the 1 GB VM's available memory and editions.
 Both Java and Bedrock runtimes are installed automatically. The destination
 Minecraft server must support the selected client version and permit the account.
 
+ALT Pilot checks for stalled starts and dropped connections in the background.
+On Complex, it lets announced Skyblock restarts return players automatically.
+A Hub chat message or an in-progress transfer does not trigger a recovery
+command. A configured Skyblock startup command waits for confirmed arrival.
+
 ## Security and ownership
 
 Each person uses their own Oracle and Microsoft accounts. No maintainer server,

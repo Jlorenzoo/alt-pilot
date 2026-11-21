@@ -55,8 +55,8 @@ test('operator identity verification rejects the wrong elliptic curve', () => {
   assert.throws(() => verifyServerIdentity(sdp + 'a=identity:' + identity), /P-384/)
 })
 
-for (const disconnect of [false, true]) {
-  test(`Skyblock target routes once after spawn and respects disconnect=${disconnect}`, t => {
+for (const event of ['normal', 'disconnect', 'reboot']) {
+  test(`Skyblock target startup follows the existing transfer during ${event}`, t => {
     const fs = require('node:fs'), os = require('node:os'), path = require('node:path')
     const { EventEmitter } = require('node:events')
     const { attachSession } = require('./client')
@@ -67,15 +67,29 @@ for (const disconnect of [false, true]) {
     client.queue = (name, params) => sent.push({ name, params })
     client.close = () => {}
     client.versionGreaterThanOrEqualTo = () => true
-    const session = attachSession(client, { root, profile: { xuid: '123' }, routeToSkyblock: true, quit: () => {}, log: () => {} })
+    const session = attachSession(client, { root, profile: { xuid: '123' }, routeToSkyblock: true,
+      settings: { startup_command_enabled: event === 'reboot' }, quit: () => {}, log: () => {} })
     try {
       client.emit('spawn'); client.emit('spawn')
       t.mock.timers.tick(19999)
       assert.equal(sent.length, 0)
-      if (disconnect) client.emit('close')
+      if (event === 'disconnect') client.emit('close')
+      if (event === 'reboot') {
+        client.emit('text', { message: "◆ REBOOT ◆ You'll automatically be sent back to Skyblock." })
+        client.emit('text', { message: 'Hub 4 [Member] Player: hello' })
+        client.emit('text', { message: '✔ Sending you to Skyblock...' })
+      }
       t.mock.timers.tick(1)
-      assert.equal(sent.length, disconnect ? 0 : 1)
-      if (!disconnect) assert.equal(sent[0].params.command, '/skyblock')
+      assert.equal(sent.length, event === 'normal' ? 1 : 0)
+      if (event === 'normal') assert.equal(sent[0].params.command, '/skyblock')
+      if (event === 'reboot') {
+        t.mock.timers.tick(50000)
+        assert.equal(sent.length, 0)
+        client.emit('text', { message: 'COMPLEX SKYBLOCK 1.21.11' })
+        client.emit('text', { message: 'COMPLEX SKYBLOCK 1.21.11' })
+        t.mock.timers.tick(30000)
+        assert.deepEqual(sent.filter(packet => packet.name === 'command_request').map(packet => packet.params.command), ['/home alt'])
+      }
     } finally {
       session.finish('test complete', 0)
       t.mock.timers.reset()

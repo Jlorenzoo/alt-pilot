@@ -9,7 +9,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 class WatchdogRecoveryTests(unittest.TestCase):
-    def run_watchdog(self, state, failed_at='0', reset_status='0', broken_helper=False, bedrock_state=None, runs=1):
+    def run_watchdog(self, state, failed_at='0', reset_status='0', broken_helper=False,
+                     bedrock_state=None, runs=1, armed=True, rejoining=False, uptime=1000,
+                     enabled='enabled', java_socket=False, previous_retry=False):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             (root / 'slots/4').mkdir(parents=True)
@@ -17,8 +19,13 @@ class WatchdogRecoveryTests(unittest.TestCase):
             (root / 'cgroup/test').mkdir(parents=True)
             (root / 'cgroup/test/cgroup.procs').write_text('123\n')
             helper = root / 'hub-recovery.py'
-            helper.write_text('raise SystemExit(1)\n')
-            (root / 'run/alt-pilot-watchdog-connected-4').write_text('1\n')
+            helper.write_text(f'raise SystemExit({0 if rejoining else 1})\n')
+            if armed:
+                (root / 'run/connected-4').write_text('1\n')
+            if previous_retry:
+                (root / 'run/startup-retry-4').write_text('99 1\n')
+            if java_socket:
+                (root / 'afk-4.log').write_text('[10:00:00] [ALT-PILOT] MCC startup began for account 4\n')
             if bedrock_state:
                 (root / 'slots/4/account.json').write_text('{"edition":"bedrock"}')
             status_helper = root / 'bedrock-connected'
@@ -29,6 +36,12 @@ class WatchdogRecoveryTests(unittest.TestCase):
             systemctl.write_text('''#!/bin/bash
 if [[ "$1" == show ]]; then
   if [[ "$2" == alt-pilot@4.service ]]; then
+    echo "UnitFileState=$TEST_ENABLED"
+    if [[ "$TEST_JAVA_SOCKET" == 1 ]]; then
+      echo ControlGroup=/test
+      printf 'LoadState=loaded\\nActiveState=active\\nActiveEnterTimestampMonotonic=1\\n'
+      exit
+    fi
     printf 'LoadState=loaded\\nActiveState=%s\\nActiveEnterTimestampMonotonic=1\\nInactiveEnterTimestampMonotonic=%s\\nControlGroup=\\n' "$TEST_STATE" "$TEST_FAILED_AT"
   elif [[ "$2" == alt-pilot.service && "$TEST_BROKEN_HELPER" == 1 ]]; then
     printf 'LoadState=loaded\\nActiveState=active\\nActiveEnterTimestampMonotonic=1\\nControlGroup=/test\\n'
@@ -44,17 +57,21 @@ fi
             for tool in ['ss', 'logger']:
                 file = root / tool
                 file.write_text('#!/bin/bash\necho pid=123\nexit 0\n' if tool == 'ss' else '#!/bin/bash\nexit 0\n')
-            (root / 'uptime').write_text('1000.0 1000.0\n')
+                file.chmod(0o755)
+            (root / 'uptime').write_text(f'{uptime}.0 {uptime}.0\n')
             script = (ROOT / 'bin/alt-pilot-watchdog').read_text()
             script = script.replace('/usr/local/bin/afk-bedrock-connected', str(status_helper))
             script = script.replace('/etc/alt-pilot/options.env', str(root / 'options.env'))
             script = script.replace('/home/mc/slots', str(root / 'slots'))
             script = script.replace('/sys/fs/cgroup', str(root / 'cgroup'))
+            script = script.replace('/opt/alt-pilot/logs', str(root))
             script = script.replace('/usr/local/sbin/alt-pilot-hub-recovery.py', str(helper))
-            script = script.replace('/run/alt-pilot', str(root / 'run/alt-pilot'))
             script = script.replace('/proc/uptime', str(root / 'uptime'))
             result = subprocess.run(['bash', '-c', '\n'.join([script] * runs)], text=True, capture_output=True,
                                     env={**os.environ, 'PATH': f'{root}:{os.environ["PATH"]}',
+                                         'RUNTIME_DIRECTORY': str(root / 'run'),
+                                         'TEST_ENABLED': enabled,
+                                         'TEST_JAVA_SOCKET': '1' if java_socket else '0',
                                          'TEST_BROKEN_HELPER': '1' if broken_helper else '0', 'TEST_STATE': state, 'TEST_FAILED_AT': failed_at,
                                          'TEST_RESET_STATUS': reset_status, 'TEST_COMMANDS': str(commands)})
             self.assertEqual(result.returncode, 0, result.stderr)
@@ -65,7 +82,25 @@ fi
 
     def test_sustained_bedrock_stall_still_recovers_after_two_confirmations(self):
         self.assertEqual(self.run_watchdog('active', bedrock_state='unresponsive', runs=2),
-                         ['restart --no-block alt-pilot@4.service'])
+                         ['try-restart --no-block alt-pilot@4.service'])
+
+    def test_stuck_java_start_retries_once_and_only_after_the_grace(self):
+        self.assertEqual(self.run_watchdog('active', armed=False, runs=3, uptime=119), [])
+        self.assertEqual(self.run_watchdog('active', armed=False, runs=3, uptime=121),
+                         ['try-restart --no-block alt-pilot@4.service'])
+
+    def test_java_tcp_socket_alone_does_not_complete_startup(self):
+        self.assertEqual(self.run_watchdog('active', armed=False, java_socket=True, uptime=121),
+                         ['try-restart --no-block alt-pilot@4.service'])
+
+    def test_repeated_startup_failures_back_off(self):
+        self.assertEqual(self.run_watchdog('active', armed=False, previous_retry=True, uptime=121), [])
+        self.assertEqual(self.run_watchdog('active', armed=False, previous_retry=True, uptime=241),
+                         ['try-restart --no-block alt-pilot@4.service'])
+
+    def test_announced_reboot_keeps_the_current_session_even_before_it_arms(self):
+        for armed in (True, False):
+            self.assertEqual(self.run_watchdog('active', armed=armed, rejoining=True, runs=3), [])
 
     def test_failed_account_is_rearmed_without_blocking_other_accounts(self):
         self.assertEqual(self.run_watchdog('failed'), [
@@ -77,6 +112,7 @@ fi
 
     def test_deliberate_stop_is_preserved(self):
         self.assertEqual(self.run_watchdog('inactive'), [])
+        self.assertEqual(self.run_watchdog('failed', enabled='disabled'), [])
 
     def test_new_failure_gets_two_minutes_before_watchdog_retry(self):
         self.assertEqual(self.run_watchdog('failed', str(1000 * 1000000)), [])
