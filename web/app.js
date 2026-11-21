@@ -826,9 +826,17 @@ function renderActivityFeed(output, lines) {
 
 let updateBusy = false;
 let updateCheckedAt = 0;
+let updateMessageTimer;
 let vmUpdate = {};
 
-function showUpdateStatus(status) {
+function showUpdateMessage(message, persistent = false) {
+  clearTimeout(updateMessageTimer);
+  const element = $('#updateMessage');
+  element.textContent = message;
+  if (!persistent) updateMessageTimer = setTimeout(() => { element.textContent = ''; }, 6000);
+}
+
+function showUpdateStatus(status, showDetails = false) {
   const messages = {
     idle: 'Install the latest published ALT Pilot release on this VM.',
     running: 'Updating ALT Pilot. The dashboard may briefly reconnect.',
@@ -839,15 +847,18 @@ function showUpdateStatus(status) {
     unavailable: 'The update service is unavailable on this VM.',
   };
   const message = messages[status.state] || messages.idle;
-  $('#updateMessage').textContent = message.replace('{version}', status.version || '');
+  if (status.state === 'running' || showDetails) {
+    showUpdateMessage(message.replace('{version}', status.version || ''), status.state === 'running');
+  }
   $('#updateButton').disabled = updateBusy || ['running', 'unavailable'].includes(status.state);
 }
 
 async function refreshUpdateStatus() {
   updateCheckedAt = Date.now();
   try {
+    const wasRunning = vmUpdate.state === 'running';
     vmUpdate = await api('/api/update');
-    if (!updateBusy) showUpdateStatus(vmUpdate);
+    if (!updateBusy) showUpdateStatus(vmUpdate, wasRunning);
   } catch {}
 }
 
@@ -873,13 +884,13 @@ $('#updateButton').addEventListener('click', async () => {
       } catch { continue; } // The updater can restart the HTTP service.
       if (!vmUpdate.attempt || vmUpdate.state === 'running') continue;
       if (vmUpdate.attempt === before.attempt && before.state !== 'running') continue;
-      showUpdateStatus(vmUpdate);
+      showUpdateStatus(vmUpdate, true);
       if (vmUpdate.state === 'updated') location.reload();
       return;
     }
-    $('#updateMessage').textContent = 'Check the update status again in a moment.';
+    showUpdateMessage('Check the update status again in a moment.');
   } catch (error) {
-    $('#updateMessage').textContent = error.message;
+    showUpdateMessage(error.message);
   } finally {
     updateBusy = false;
     $('#updateButton').disabled = ['running', 'unavailable'].includes(vmUpdate.state);
@@ -900,8 +911,8 @@ function renderRemoteAccess(local) {
   }
   $('#logoutLink').classList.toggle('hidden', !local.remote_mode);
   $('#passwordPanel').classList.toggle('hidden', !(local.remote_mode || access.url) || !onRemoteTab);
-  $('#updatePanel').classList.toggle('hidden', !local.remote_mode || !onRemoteTab);
-  if (local.remote_mode && onRemoteTab && !updateBusy && Date.now() - updateCheckedAt > 5000) refreshUpdateStatus();
+  $('#updatePanel').classList.toggle('hidden', !local.remote_mode);
+  if (local.remote_mode && !updateBusy && Date.now() - updateCheckedAt > 5000) refreshUpdateStatus();
   remoteUnavailable?.classList.toggle('hidden', Boolean(local.remote_mode || access.url) || !onRemoteTab);
   $('#settingsSaveActions')?.classList.toggle('hidden', onRemoteTab);
   $('#passwordMessage').textContent = local.remote_mode
