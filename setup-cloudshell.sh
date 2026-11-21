@@ -6,10 +6,10 @@ for cmd in oci git curl jq ssh ssh-keygen python3 flock; do
   command -v "$cmd" >/dev/null || { echo "Open Oracle Cloud Console, click >_ then Cloud Shell, and paste the command there. Missing tool: $cmd" >&2; exit 1; }
 done
 mode="${1:-install}"
-case "$mode" in install|--status|--repair|--reset-password) ;; *) echo 'Usage: setup-cloudshell.sh [--status|--repair|--reset-password]' >&2; exit 2;; esac
+case "$mode" in install|--status|--repair|--repair-accounts|--reset-password) ;; *) echo 'Usage: setup-cloudshell.sh [--status|--repair|--repair-accounts [COMMIT]|--reset-password]' >&2; exit 2;; esac
 REPO_DIR="$HOME/alt-pilot"
 if [[ -d "$REPO_DIR/.git" ]]; then
-  if [[ "$mode" != --status ]]; then
+  if [[ "$mode" != --status && "$mode" != --repair-accounts ]]; then
     git -C "$REPO_DIR" diff --quiet && git -C "$REPO_DIR" diff --cached --quiet || { echo "Your installer files were edited. Your server is safe; keep these edits before updating." >&2; exit 1; }
     git -C "$REPO_DIR" pull --ff-only
   fi
@@ -25,6 +25,32 @@ mkdir -p .state
 chmod 700 .state
 exec 9>.state/onboarding.lock
 flock -n 9 || { echo 'Setup is already running in another Cloud Shell window. Wait for that window to finish.' >&2; exit 1; }
+if [[ "$mode" == --repair-accounts ]]; then
+  repair_revision="${2:-refs/heads/main}"
+  [[ "$repair_revision" == refs/heads/main || "$repair_revision" =~ ^[0-9a-f]{40}$ ]] || {
+    echo 'The account repair revision must be a full ALT Pilot commit ID.' >&2
+    exit 2
+  }
+  [[ -s .state/vm.json && -s .state/oracle_ed25519 ]] || {
+    echo 'Open the Cloud Shell you used to install ALT Pilot. Its saved VM or SSH key is missing here.' >&2
+    exit 1
+  }
+  VM_IP="$(jq -er '.public_ip | strings' .state/vm.json)"
+  python3 -c 'import ipaddress, sys; ipaddress.IPv4Address(sys.argv[1])' "$VM_IP"
+  git fetch --no-tags https://github.com/Jlorenzoo/alt-pilot.git "$repair_revision"
+  git archive --format=tar.gz FETCH_HEAD vm/install-account-controls.sh bin/alt-pilot-account-service \
+    bin/alt-pilot-account-request service/alt-pilot-account-action@.service |
+    ssh -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+      -i .state/oracle_ed25519 "ubuntu@$VM_IP" '
+        set -eu
+        stage=$(mktemp -d /tmp/alt-pilot-account-repair.XXXXXXXX)
+        trap "rm -rf \"$stage\"" EXIT
+        tar -xzf - -C "$stage"
+        sudo -n bash "$stage/vm/install-account-controls.sh"
+      '
+  echo 'ALT Pilot account controls repaired. Refresh the dashboard and click Start for Alt 2.'
+  exit
+fi
 # This installation gets its own key; existing personal SSH keys are untouched.
 export SSH_KEY="$REPO_DIR/.state/oracle_ed25519.pub"
 if [[ ! -f "${SSH_KEY%.pub}" ]]; then ssh-keygen -q -t ed25519 -N '' -C alt-pilot-cloudshell -f "${SSH_KEY%.pub}"; fi

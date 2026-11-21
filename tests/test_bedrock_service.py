@@ -39,7 +39,7 @@ class BedrockServiceTests(unittest.TestCase):
             def restart(edition):
                 (slots / 'account.json').write_text(json.dumps({'edition': edition}))
                 commands.write_text('')
-                result = subprocess.run(['bash', '-c', script, 'gateway', 'restart', '4'], env=env,
+                result = subprocess.run(['bash', '-c', script, 'gateway', 'restart-4'], env=env,
                                         capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
                 return commands.read_text().splitlines()
@@ -49,6 +49,22 @@ class BedrockServiceTests(unittest.TestCase):
             self.assertEqual(restart('bedrock'), ['enable alt-pilot@4.service', 'stop alt-pilot@4.service', 'start alt-pilot@4.service'])
             self.assertEqual(restart('java'), ['daemon-reload', 'enable alt-pilot@4.service', 'stop alt-pilot@4.service', 'start alt-pilot@4.service'])
             self.assertFalse(dropin.exists())
+
+    def test_account_request_only_starts_validated_systemd_instances(self):
+        with tempfile.TemporaryDirectory() as folder:
+            systemctl = Path(folder) / 'systemctl'
+            systemctl.write_text('#!/bin/bash\nprintf "%s\\n" "$@"\n')
+            systemctl.chmod(0o755)
+            env = {**os.environ, 'PATH': f'{folder}:{os.environ["PATH"]}'}
+            gateway = ['bash', str(ROOT / 'bin/alt-pilot-account-request')]
+            valid = subprocess.run([*gateway, 'start', '2'], env=env, capture_output=True, text=True)
+            self.assertEqual(valid.returncode, 0, valid.stderr)
+            self.assertEqual(valid.stdout.splitlines(), [
+                '--no-ask-password', 'start', 'alt-pilot-account-action@start-2.service',
+            ])
+            invalid = subprocess.run([*gateway, 'start', '11'], env=env, capture_output=True, text=True)
+            self.assertEqual(invalid.returncode, 2)
+            self.assertEqual(invalid.stdout, '')
 
     def test_webrtc_budget_retains_shared_vm_cap_and_interface_discovery(self):
         config = (ROOT / 'service/alt-pilot-bedrock.conf').read_text()

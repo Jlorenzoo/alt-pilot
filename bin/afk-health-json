@@ -90,16 +90,12 @@ unit_json() {
     connection_state="$("$HELPER_DIR/afk-bedrock-connected" "$slot" "$cgroup" --status)"
     [[ "$connection_state" == connected ]] && connected=true
   fi
-  connection_marker="/run/alt-pilot-connected-${slot}"
-  if [[ "$connected" == true ]]; then
-    printf '%s\n' "$active_mono" > "$connection_marker"
-  elif [[ "$active" == active && -r "$connection_marker" ]]; then
+  connection_marker="/run/alt-pilot-watchdog/connected-${slot}"
+  if [[ "$connected" != true && "$active" == active ]]; then
     marker_start="$(cat "$connection_marker" 2>/dev/null || true)"
     if [[ "$connection_state" == delayed || "$connection_state" == unresponsive ]]; then
       startup_phase="$connection_state"
     elif [[ "$marker_start" == "$active_mono" ]]; then startup_phase="disconnected"; fi
-  elif [[ "$active" != active ]]; then
-    rm -f "$connection_marker"
   fi
   if [[ "$connected" == true && -p "/home/mc/slots/${slot}/control.fifo" ]]; then
     communication_ready=true

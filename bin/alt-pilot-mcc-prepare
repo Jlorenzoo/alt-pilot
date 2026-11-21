@@ -61,31 +61,15 @@ else
   rm -f "$startup_script"
 fi
 
-# Explicit Skyblock transfer failure recovery (e.g. redirect timed out on reconnect)
-cat > "$profile/to_skyblock.txt" <<EOF
-wait 60
-send /skyblock
-EOF
-chmod 600 "$profile/to_skyblock.txt"
-
-rm -f "$profile/skyblock_arrival.txt" "$profile/island_retry.txt"
+rm -f "$profile/skyblock_arrival.txt" "$profile/island_retry.txt" "$profile/to_skyblock.txt"
 matches_file="$profile/matches.ini"
 : > "$matches_file"
-
-cat >> "$matches_file" <<EOF
-[Match]
-regex=(?i)Failed to go to server\s+Skyblock:\s+Redirect timed out
-action=script to_skyblock.txt
-actionprivate=script to_skyblock.txt
-actionother=script to_skyblock.txt
-cooldown=15
-EOF
 
 if [[ "$startup_enabled" == "true" ]]; then
   cat >> "$matches_file" <<EOF
 
 [Match]
-regex=(?i)COMPLEX SKYBLOCK 1\.
+regex=(?i)^\s*COMPLEX SKYBLOCK\b
 action=script startup.txt
 actionprivate=script startup.txt
 actionother=script startup.txt
@@ -122,6 +106,15 @@ account_line='Account = { Login = "", Password = "" }'
 if [[ -f "$config" ]]; then
   found="$(grep -E '^[[:space:]]*Account[[:space:]]*=[[:space:]]*\{' "$config" | head -1 || true)"
   [[ -n "$found" ]] && account_line="$found"
+fi
+# Device-code sign-in uses a temporary INI. MCC saves its session under the
+# Minecraft profile name, so seed an empty runtime login from this slot's cache.
+# Otherwise MCC waits for an interactive authentication selection on the FIFO.
+if [[ "$account_line" == 'Account = { Login = "", Password = "" }' && -s "$profile/SessionCache.db" ]]; then
+  profile_name="$(/usr/local/bin/afk-mcc-profile-name "$profile/SessionCache.db")"
+  if [[ "$profile_name" =~ ^[A-Za-z0-9_]{3,16}$ ]]; then
+    account_line="Account = { Login = \"$profile_name\", Password = \"\" }"
+  fi
 fi
 
 tmp="$(mktemp "$profile/MinecraftClient.ini.XXXXXX")"

@@ -21,6 +21,10 @@ fi
 /usr/local/bin/alt-pilot-mcc-prepare "$slot"
 [[ -s "$profile/SessionCache.db" ]] \
   || { echo "MCC account $slot is not signed in. Use the dashboard sign-in action first." >&2; exit 1; }
+if grep -Fxq 'Account = { Login = "", Password = "" }' "$profile/MinecraftClient.ini"; then
+  echo "MCC account $slot has no usable saved Java identity. Sign in again from the dashboard." >&2
+  exit 1
+fi
 
 rm -f "$fifo"
 mkfifo -m 600 "$fifo"

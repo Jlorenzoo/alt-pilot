@@ -1200,6 +1200,7 @@ class AccountSettingsTests(unittest.TestCase):
             patched_prepare = prepare_text.replace("/home/mc/slots/", f"{slots_dir.as_posix()}/")
             patched_prepare = patched_prepare.replace("source_binary=/opt/alt-pilot/mcc/disk/MinecraftClient", f"source_binary={fake_binary.as_posix()}")
             patched_prepare = patched_prepare.replace("item_controls_source=/opt/alt-pilot/mcc/item-controls.cs", "item_controls_source=" + str(Path(__file__).resolve().parents[1] / "vm/item-controls.cs"))
+            patched_prepare = patched_prepare.replace("/usr/local/bin/afk-mcc-profile-name", str(root / "bin/afk-mcc-profile-name"))
             patched_prepare = patched_prepare.replace('[[ "$(id -un)" == mc ]] || {', '[[ 1 == 1 ]] || {')
             prepare_runner = Path(sandbox) / "mcc-prepare"
             prepare_runner.write_text(patched_prepare, encoding="utf-8")
@@ -1215,18 +1216,17 @@ class AccountSettingsTests(unittest.TestCase):
             self.assertIn("(DiddlyNoodle|jlorenzoo)\\*?\\s+has requested (?:for you to teleport to them|that you teleport to them|to teleport to you|that they teleport to you)", matches_ini)
             self.assertIn("action=send /tpyes", matches_ini)
             self.assertIn("actionother=send /tpyes", matches_ini)
-            self.assertIn("regex=(?i)COMPLEX SKYBLOCK 1\\.", matches_ini)
+            self.assertIn("regex=(?i)^\\s*COMPLEX SKYBLOCK\\b", matches_ini)
             self.assertIn("action=script startup.txt", matches_ini)
             self.assertIn("cooldown=600", matches_ini)
-            self.assertIn("Failed to go to server\\s+Skyblock:\\s+Redirect timed out", matches_ini)
-            self.assertIn("action=script to_skyblock.txt", matches_ini)
-            self.assertTrue((mcc_dir / "to_skyblock.txt").exists())
-            self.assertEqual((mcc_dir / "to_skyblock.txt").read_text(encoding="utf-8").strip(), "wait 60\nsend /skyblock")
+            self.assertNotIn("Redirect timed out", matches_ini)
+            self.assertFalse((mcc_dir / "to_skyblock.txt").exists())
             self.assertNotIn("/skyblock", matches_ini)
             self.assertNotIn("island is", matches_ini)
             self.assertFalse((mcc_dir / "island_retry.txt").exists())
 
             mcc_ini = (mcc_dir / "MinecraftClient.ini").read_text(encoding="utf-8")
+            self.assertIn('Account = { Login = "", Password = "" }', mcc_ini)
             self.assertIn("InventoryHandling = true", mcc_ini)
             self.assertIn("[ChatBot.ScriptScheduler]\nEnabled = true", mcc_ini)
             self.assertIn('Action = "script item-controls.cs"', mcc_ini)
@@ -1236,23 +1236,24 @@ class AccountSettingsTests(unittest.TestCase):
             self.assertIn("[ChatBot.AutoRespond]\nEnabled = true", mcc_ini)
             self.assertIn('Matches_File = "matches.ini"', mcc_ini)
 
+            # An existing saved account can have a blank runtime login because
+            # device-code sign-in wrote to the temporary Login.ini instead.
+            payload = base64.urlsafe_b64encode(json.dumps({"pfd": [{"type": "mc", "name": "ExistingAlt"}]}).encode()).rstrip(b"=")
+            cache = mcc_dir / "SessionCache.db"
+            cache.write_bytes(b"eyJhbGciOiJSUzI1NiJ9." + payload)
+            (mcc_dir / "to_skyblock.txt").write_text("send /skyblock\n")
             subprocess.run(["bash", runner.as_posix(), str(slot), "0", "5", "/home alt", "1", "DiddlyNoodle, jlorenzoo", "spawner"], capture_output=True, text=True, check=True, env=env)
             subprocess.run(["bash", prepare_runner.as_posix(), str(slot)], capture_output=True, text=True, check=True)
+            self.assertIn('Account = { Login = "ExistingAlt", Password = "" }',
+                          (mcc_dir / "MinecraftClient.ini").read_text(encoding="utf-8"))
+            self.assertEqual(cache.read_bytes(), b"eyJhbGciOiJSUzI1NiJ9." + payload)
             self.assertFalse((mcc_dir / "startup.txt").exists())
-            self.assertTrue((mcc_dir / "to_skyblock.txt").exists())
+            self.assertFalse((mcc_dir / "to_skyblock.txt").exists())
             disabled_matches = (mcc_dir / "matches.ini").read_text(encoding="utf-8")
             self.assertNotIn("script startup.txt", disabled_matches)
-            self.assertIn("action=script to_skyblock.txt", disabled_matches)
+            self.assertNotIn("action=script to_skyblock.txt", disabled_matches)
             self.assertEqual(json.loads((slot_dir / "settings.json").read_text(encoding="utf-8"))["startup_command"], "/home alt")
 
-    def test_skyblock_redirect_timeout_regex_patterns(self):
-        pattern = re.compile(r"(?i)Failed to go to server\s+Skyblock:\s+Redirect timed out")
-        self.assertTrue(pattern.search("▌! Failed to go to server Skyblock: Redirect timed out"))
-        self.assertTrue(pattern.search("! Failed to go to server Skyblock: Redirect timed out"))
-        self.assertTrue(pattern.search("Failed to go to server Skyblock: Redirect timed out"))
-        self.assertTrue(pattern.search("[13:27:50] [SERVER] ▌! Failed to go to server Skyblock: Redirect timed out"))
-        self.assertFalse(pattern.search("✔ Sending you to Skyblock..."))
-        self.assertFalse(pattern.search("You are already trying to connect to a Server!"))
 
     def test_tpa_auto_accept_regex_live_patterns(self):
         names = ["DiddlyNoodle", "jlorenzoo", "jlorenzo", "_Jlorenzoo_", "Alexeitor1", "mickele29"]

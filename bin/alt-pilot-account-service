@@ -4,6 +4,10 @@ set -Eeuo pipefail
 
 action="${1:-}"
 slot="${2:-}"
+if [[ $# -eq 1 && "$action" =~ ^(start|stop|restart)-([1-9]|10)$ ]]; then
+  action="${BASH_REMATCH[1]}"
+  slot="${BASH_REMATCH[2]}"
+fi
 [[ "$action" == start || "$action" == stop || "$action" == restart ]] \
   || { echo "Usage: alt-pilot-account-service start|stop|restart ACCOUNT_NUMBER" >&2; exit 2; }
 [[ "$slot" =~ ^([1-9]|10)$ ]] || { echo "Account number must be between 1 and 10." >&2; exit 2; }

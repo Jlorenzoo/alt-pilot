@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+# Submit only validated account actions to the host systemd manager.
+set -Eeuo pipefail
+
+[[ $# -eq 2 && "$1" =~ ^(start|stop|restart)$ && "$2" =~ ^([1-9]|10)$ ]] || {
+  echo 'Usage: alt-pilot-account-service start|stop|restart ACCOUNT_NUMBER' >&2
+  exit 2
+}
+unit="alt-pilot-account-action@$1-$2.service"
+if ! systemctl --no-ask-password start "$unit"; then
+  invocation="$(systemctl show --property=InvocationID --value "$unit" 2>/dev/null || true)"
+  if [[ "$invocation" =~ ^[a-f0-9]{32}$ ]]; then
+    journalctl --no-pager --quiet -o cat -n 12 "_SYSTEMD_INVOCATION_ID=$invocation" >&2 || true
+  fi
+  exit 1
+fi

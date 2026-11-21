@@ -85,7 +85,7 @@ async function login (root) {
   atomicJson(path.join(folder, 'profile.json'), profile)
   console.log(`Bedrock profile verified: ${profile.name}`)
 }
-function attachSession (client, { root, profile, settings = {}, log = console.log, quit = process.exit, now = Date.now, dropEnabled = true, routeToSkyblock = false }) {
+function attachSession (client, { root, profile, settings = {}, log = console.log, quit = process.exit, now = Date.now, dropEnabled = true, routeToSkyblock = false, waitForSkyblock = routeToSkyblock }) {
   try { fs.chmodSync(path.join(root, 'bedrock'), 0o755) } catch {}
   const stateFile = path.join(root, 'bedrock/status.json')
   let spawned = false
@@ -606,16 +606,30 @@ function attachSession (client, { root, profile, settings = {}, log = console.lo
     } catch {}
     return settings
   }
+  let waitingForReturn = false
+  let atSkyblock = false
+  let skyblockVisit = 0
+  function scheduleStartup (curSettings) {
+    if (!curSettings.startup_command_enabled) return
+    const visit = skyblockVisit
+    const delay = Math.max(waitForSkyblock ? 30 : 0, Number(curSettings.startup_delay) || 5)
+    schedule(() => {
+      if (!waitForSkyblock || (atSkyblock && !waitingForReturn && visit === skyblockVisit)) {
+        send(curSettings.startup_command || '/home alt')
+      }
+    }, delay * 1000)
+  }
   client.on('spawn', () => {
     spawned = true
     state(true)
     log('[ALT-PILOT] Server was successfully joined (Bedrock).')
     if (routeToSkyblock && !initialRouteScheduled) {
       initialRouteScheduled = true
-      schedule(() => send('/skyblock'), 20000)
+      schedule(() => {
+        if (!waitingForReturn && !atSkyblock) send('/skyblock')
+      }, 20000)
     }
-    const curSettings = loadSettings()
-    if (curSettings.startup_command_enabled) schedule(() => send(curSettings.startup_command || '/home alt'), Math.max(0, Number(curSettings.startup_delay) || 5) * 1000)
+    if (!waitForSkyblock) scheduleStartup(loadSettings())
   })
   let xpLevel = null
   let xpProgress = null
@@ -686,7 +700,6 @@ function attachSession (client, { root, profile, settings = {}, log = console.lo
   const clearXP = () => { xpLevel = null; xpProgress = null; sidebarObjective = null; scoreRows.clear() }
   client.on('change_dimension', clearXP)
   client.on('respawn', clearXP)
-  let lastRoute = 0
   client.on('text', packet => {
     let text = String(packet.message || '')
     if (packet.type === 'translation' && Array.isArray(packet.parameters) && packet.parameters.length >= 2) {
@@ -694,6 +707,7 @@ function attachSession (client, { root, profile, settings = {}, log = console.lo
     }
     log(text)
     const plain = text.replace(/§./g, '')
+    const serverMessage = plain.replace(/^[\s▌✔✓➜◆!]+/, '')
     if (/You(?:'|’)re already on (?:Skyblock|Hub(?: \d+)?|Lobby)|COMPLEX SKYBLOCK|Sending you to Skyblock|island is (?:currently )?(?:offline|restarting|loading)/i.test(plain)) {
       setRoutePending(false)
       if (/COMPLEX SKYBLOCK/i.test(plain)) {
@@ -701,6 +715,15 @@ function attachSession (client, { root, profile, settings = {}, log = console.lo
       }
     }
     const curSettings = loadSettings()
+    if (waitForSkyblock && /^(?:REBOOT\b.*Skyblock will be rebooting|REBOOT\b.*automatically be sent back to Skyblock|Sending you to Skyblock\b)/i.test(serverMessage)) {
+      if (!waitingForReturn) skyblockVisit += 1
+      waitingForReturn = true
+      atSkyblock = false
+    } else if (waitForSkyblock && !atSkyblock && /^COMPLEX SKYBLOCK\b/i.test(serverMessage)) {
+      waitingForReturn = false
+      atSkyblock = true
+      scheduleStartup(curSettings)
+    }
     const incoming = chatControls.parseCommand(packet, profile.name || client.username || '')
     if (/\b(?:xp\??|help|hlep)\s*$/i.test(plain)) {
       log('[ALT-PILOT] Chat command check: ' + JSON.stringify({ type: packet.type, source: packet.source_name || '', parameters: packet.parameters, parsed: incoming, allowed: Boolean(incoming && chatControls.whitelisted(incoming.sender, curSettings.tpa_whitelist)) }))
@@ -751,12 +774,6 @@ function attachSession (client, { root, profile, settings = {}, log = console.lo
           reply(sender, command === 'use xp' || command === 'item use xp' ? holdXP(true, sender) : command === 'item hold xp' ? holdXP() : command === 'item use' ? useItem() : dropItem())
         }
       }
-    }
-    if (/^Hub \d+\s/i.test(plain) && Date.now() - lastRoute > 30000) {
-      lastRoute = Date.now(); schedule(() => send('/skyblock'), 20000)
-    }
-    if (curSettings.startup_command_enabled && /Sending you to Skyblock|COMPLEX SKYBLOCK|island is (?:currently )?(?:offline|restarting|loading)/i.test(plain) && Date.now() - lastRoute > 5000) {
-      lastRoute = Date.now(); schedule(() => send(curSettings.startup_command || '/home alt'), 10000)
     }
     if (curSettings.tpa_auto_accept && /has requested (?:for you|that you) to teleport to them/i.test(plain)) {
       const match = plain.match(/(?:\]|\s)(\S+)\*?\s+has requested (?:for you|that you) to teleport to them/i)
@@ -889,8 +906,10 @@ async function run (root) {
   })
   configurePassiveDecoding(client)
   client.viewDistance = 2
-  const routeToSkyblock = process.env.MC_SERVER?.split(':')[0] === 'skyblock.mc-complex.com'
-  const session = attachSession(client, { root, profile, settings, routeToSkyblock })
+  const configuredHost = process.env.MC_SERVER?.split(':')[0]?.toLowerCase()
+  const routeToSkyblock = configuredHost === 'skyblock.mc-complex.com'
+  const waitForSkyblock = address.host === 'mc-complex.com' || address.host.endsWith('.mc-complex.com')
+  const session = attachSession(client, { root, profile, settings, routeToSkyblock, waitForSkyblock })
   readline.createInterface({ input: process.stdin }).on('line', session.send)
   for (const signal of ['SIGINT', 'SIGTERM']) process.on(signal, () => session.finish('Stopped.', 0))
 }

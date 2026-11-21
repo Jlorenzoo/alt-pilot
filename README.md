@@ -47,6 +47,19 @@ If setup was interrupted, run the original command again. It resumes your saved
 VM rather than creating another one. Your saved Minecraft sign-ins are retained
 when repairing the app.
 
+## Repair account Start and Stop
+
+If the dashboard reports a read-only filesystem when starting an account,
+paste this command into the Oracle Cloud Shell you used for setup.
+
+```bash
+repair=$(curl -fsSL https://raw.githubusercontent.com/Jlorenzoo/alt-pilot/main/setup-cloudshell.sh) && bash -c "$repair" -- --repair-accounts
+```
+
+When it says **ALT Pilot account controls repaired**, refresh the dashboard
+and click **Start** on the affected account. Your sign-ins and running accounts
+are kept.
+
 ## Cost and capacity
 
 The installer selects one Always Free-eligible E2 Micro and a 50 GB boot disk in
@@ -60,6 +73,11 @@ Start with one Minecraft account. Up to ten accounts can be saved; the number
 that can run together depends on the 1 GB VM's available memory and editions.
 Both Java and Bedrock runtimes are installed automatically. The destination
 Minecraft server must support the selected client version and permit the account.
+
+ALT Pilot checks for stalled starts and dropped connections in the background.
+On Complex, it lets announced Skyblock restarts return players automatically.
+A Hub chat message or an in-progress transfer does not trigger a recovery
+command. A configured Skyblock startup command waits for confirmed arrival.
 
 ## Security and ownership
 
