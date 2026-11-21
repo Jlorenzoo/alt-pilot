@@ -1,0 +1,13 @@
+[Unit]
+Description=Install the latest published ALT Pilot release
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/alt-pilot/update.sh
+StateDirectory=alt-pilot-update
+StateDirectoryMode=0755
+UMask=0077
+Nice=10
+TimeoutStartSec=30min

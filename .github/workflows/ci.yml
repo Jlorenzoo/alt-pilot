@@ -50,6 +50,8 @@ jobs:
         run: |
           sudo env AFK_REMOTE_ACCESS=none bash vm/setup-vm.sh
           sudo env AFK_DISPOSABLE_TEST=1 python3 tools/vm_smoke.py
+      - name: Apply an application update in place
+        run: sudo python3 vm/apply-release.py "$PWD"
 
   https-smoke:
     name: IP HTTPS certificate
@@ -67,3 +69,23 @@ jobs:
           tar -xzf /tmp/alt-pilot-https-test/caddy.tar.gz -C /tmp/alt-pilot-https-test caddy
       - name: Validate real IP ACME challenge, NAT-safe HTTPS, login and restart
         run: python3 tools/test_https.py --caddy /tmp/alt-pilot-https-test/caddy
+
+  publish-release:
+    if: github.ref_type == 'tag'
+    needs: [test, vm-smoke, https-smoke]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Publish the tested VM application release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          git merge-base --is-ancestor HEAD origin/main
+          git archive --format=tar.gz -o alt-pilot-vm.tar.gz HEAD availability.py chat_whitelist.py control_center.py remote_control.py mc_server_ping.py web bin bedrock service vm
+          gh release create "$GITHUB_REF_NAME" alt-pilot-vm.tar.gz --verify-tag --generate-notes --latest

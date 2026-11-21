@@ -37,6 +37,20 @@ LOGIN_HASH_LIMIT = threading.BoundedSemaphore(2)
 SESSION_DAYS = int(os.environ.get("AFK_SESSION_DAYS", "30"))
 SESSION_SECONDS = SESSION_DAYS * 24 * 60 * 60
 PUBLIC_PATHS = {"/login.css", "/icon.svg", "/brand-lockup.svg", "/favicon.ico"}
+UPDATE_REQUEST = Path("/usr/local/sbin/alt-pilot-update-request")
+UPDATE_STATUS = Path("/var/lib/alt-pilot-update/status.json")
+
+
+def update_status() -> dict:
+    if not UPDATE_REQUEST.is_file():
+        return {"state": "unavailable"}
+    try:
+        status = json.loads(UPDATE_STATUS.read_text())
+        if status["state"] == "running" and time.time() - UPDATE_STATUS.stat().st_mtime > 31 * 60:
+            status["state"] = "failed"
+        return status
+    except (OSError, ValueError, KeyError, TypeError):
+        return {"state": "idle"}
 
 
 def _hash_token(token: str) -> str:
@@ -629,6 +643,9 @@ class RemoteHandler(core.Handler):
             else:
                 self.send_response(303); self.send_header("Location", "/login"); self.end_headers()
             return
+        if path == "/api/update":
+            self.json_response(update_status())
+            return
         super().do_GET()
 
     def do_POST(self) -> None:
@@ -705,6 +722,14 @@ class RemoteHandler(core.Handler):
             payload = json.loads(self.rfile.read(length) or b"{}")
             if not isinstance(payload, dict):
                 raise ValueError("Request body must be a JSON object.")
+            if payload.get("action") == "update_app":
+                if not UPDATE_REQUEST.is_file():
+                    raise RuntimeError("The update service is unavailable on this VM.")
+                result = command(["sudo", "-n", str(UPDATE_REQUEST)], timeout=5)
+                if result.returncode:
+                    raise RuntimeError("Could not start the update service.")
+                self.json_response({"queued": True}, 202)
+                return
             task = remote_task(str(payload.get("action", "")), payload)
             self.json_response({"task": task.public()}, 202)
         except (ValueError, RuntimeError, json.JSONDecodeError) as exc:

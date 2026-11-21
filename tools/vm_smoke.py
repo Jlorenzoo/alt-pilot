@@ -34,6 +34,7 @@ def main():
         subprocess.run(['systemctl', 'is-active', '--quiet', service], check=True)
     require(request('GET', '/login')[0] == 200, 'Login page is unavailable.')
     require(request('GET', '/api/bootstrap')[0] == 401, 'Unauthenticated API access was accepted.')
+    require(request('GET', '/api/update')[0] == 401, 'Unauthenticated updater access was accepted.')
     password = Path('/opt/alt-pilot/initial-control-password').read_text().strip()
 
     def login(value):
@@ -51,6 +52,23 @@ def main():
     token = bootstrap['token']
     session.update({'Content-Type': 'application/json', 'X-Control-Token': token,
                     'Origin': 'https://127.0.0.1:8765'})
+    require(request('GET', '/api/update', headers=session)[0] == 200, 'Updater status is unavailable.')
+    update_fixture = Path('/run/systemd/system/alt-pilot-update.service.d/smoke.conf')
+    update_fixture.parent.mkdir(parents=True)
+    update_fixture.write_text('[Service]\nExecStart=\nExecStart=/usr/bin/true\n')
+    try:
+        subprocess.run(['systemctl', 'daemon-reload'], check=True)
+        require(request('POST', '/api/actions', '{"action":"update_app"}', session)[0] == 202,
+                'The dashboard could not queue the restricted updater unit.')
+        require(subprocess.run(['runuser', '-u', 'afk-control', '--', 'sudo', '-n',
+                                '/usr/local/sbin/alt-pilot-update-request', 'extra'],
+                               stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL).returncode != 0,
+                'The updater accepted arguments from the dashboard user.')
+    finally:
+        subprocess.run(['systemctl', 'stop', 'alt-pilot-update.service'], check=True)
+        update_fixture.unlink()
+        update_fixture.parent.rmdir()
+        subprocess.run(['systemctl', 'daemon-reload'], check=True)
 
     def action(payload):
         status, _, data = request('POST', '/api/actions', json.dumps(payload), session)

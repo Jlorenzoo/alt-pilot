@@ -628,6 +628,10 @@
                     </div>
                     <div class="password-actions"><p id="passwordMessage" data-i18n="settings_password_msg_default">Existing signed-in sessions stay active.</p><button id="changePasswordButton" class="button secondary" type="button" data-i18n="settings_change_password_btn">Change password</button></div>
                   </section>
+                  <section id="updatePanel" class="panel form-panel remote-access-panel hidden">
+                    <div class="panel-heading"><div><h3 data-i18n="update_title">Software update</h3></div></div>
+                    <div class="password-actions"><p id="updateMessage" role="status"></p><button id="updateButton" class="button secondary" type="button" data-i18n="update_install">Install latest update</button></div>
+                  </section>
                   <div id="remoteUnavailable" class="settings-empty hidden"><strong data-i18n="settings_remote_unavailable_title">Remote access is not set up</strong><p data-i18n="settings_remote_unavailable_desc">Complete the secure install in Account setup to create a public control link.</p></div>
                 </section>
                 <div class="form-actions" id="settingsSaveActions"><p id="settingsMessage" data-i18n="settings_save_msg">Changes take effect after the next client restart.</p><button class="button primary" id="settingsSaveBtn" type="button" data-i18n="settings_save_btn">Save</button></div>
@@ -791,8 +795,8 @@
   </div>
 
   <script src="/console-format.js?v=8"></script>
-  <script src="/i18n.js?v=20261026controls2"></script>
-  <script src="/app.js?v=20261029sharedaccounts1"></script>
+  <script src="/i18n.js?v=20261121update1"></script>
+  <script src="/app.js?v=20261121update1"></script>
   <script src="/availability.js?v=20261029sharedaccounts1"></script>
 </body>
 </html>

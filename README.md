@@ -60,6 +60,23 @@ When it says **ALT Pilot account controls repaired**, refresh the dashboard
 and click **Start** on the affected account. Your sign-ins and running accounts
 are kept.
 
+## Update from the dashboard
+
+Open **Settings → Remote access → Software update** and select
+**Install latest update**. The VM verifies the published release, keeps
+saved sign-ins and settings, and reloads the dashboard. Running Minecraft
+clients pick up updated runtime code on their next restart.
+
+Installations created before the update button need one in-place repair to
+add it. Paste this into the Oracle Cloud Shell used for setup.
+
+```bash
+repair=$(curl -fsSL https://raw.githubusercontent.com/Jlorenzoo/alt-pilot/main/setup-cloudshell.sh) && bash -c "$repair" -- --repair
+```
+
+Maintainers publish updates by pushing a new `vMAJOR.MINOR.PATCH` tag for a
+commit on `main`. CI publishes the download after its checks pass.
+
 ## Cost and capacity
 
 The installer selects one Always Free-eligible E2 Micro and a 50 GB boot disk in

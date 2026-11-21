@@ -2,6 +2,7 @@
 # vm/uninstall.sh — remove AFK setup but DO NOT delete the VM itself.
 set -e
 systemctl stop 'alt-pilot-account-action@*.service' 2>/dev/null || true
+systemctl stop alt-pilot-update.service 2>/dev/null || true
 systemctl disable --now alt-pilot-firewall.service alt-pilot-https.service alt-pilot-tunnel.service \
   alt-pilot-control.service alt-pilot-watchdog.timer \
   alt-pilot.service alt-pilot-alt.service 'alt-pilot@*.service' 2>/dev/null || true
@@ -11,6 +12,7 @@ rm -f /etc/systemd/system/alt-pilot-firewall.service /usr/local/sbin/alt-pilot-f
   /etc/systemd/system/alt-pilot-tunnel.service \
   /etc/systemd/system/alt-pilot@.service \
   /etc/systemd/system/alt-pilot-account-action@.service \
+  /etc/systemd/system/alt-pilot-update.service \
   /etc/systemd/system/alt-pilot-watchdog.service \
   /etc/systemd/system/alt-pilot-watchdog.timer \
   /etc/systemd/system/alt-pilot.slice
@@ -32,9 +34,11 @@ rm -f /usr/local/bin/afk-status /usr/local/bin/afk-start \
       /usr/local/bin/mc-login /usr/local/bin/mc-signout \
       /usr/local/sbin/alt-pilot-account-service \
       /usr/local/libexec/alt-pilot-account-action \
+      /usr/local/sbin/alt-pilot-update-request \
       /usr/local/bin/afk-control-logs \
       /usr/local/sbin/alt-pilot-set-options
 rm -rf /etc/alt-pilot /var/lib/alt-pilot /var/lib/alt-pilot-proxy
+rm -rf /usr/local/libexec/alt-pilot /var/lib/alt-pilot-update
 rm -f /usr/local/bin/caddy
 userdel -r alt-pilot-proxy 2>/dev/null || true
 userdel -r alt-pilot-build 2>/dev/null || true
