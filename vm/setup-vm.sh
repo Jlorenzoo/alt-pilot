@@ -16,6 +16,8 @@ SETUP_VM_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SETUP_VM_DIR/../lib/common.sh"
 
 require_root
+exec 9>/run/alt-pilot-install.lock
+flock -n 9 || die "An ALT Pilot install or update is already running."
 # Keep account runtimes running, but stop the controller before safely migrating
 # its private password/session/SQLite state during a repair.
 systemctl stop alt-pilot-control.service 2>/dev/null || true

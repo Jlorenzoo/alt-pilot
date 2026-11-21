@@ -22,6 +22,8 @@ cleanup() {
 trap 'cleanup "$?"' EXIT
 trap 'exit 143' TERM INT
 write_status running
+exec 9>/run/alt-pilot-install.lock
+flock -n 9 || { echo 'An ALT Pilot install is already running.' >&2; exit 1; }
 
 github=(curl --disable --proto '=https' --proto-redir '=https' --silent --show-error
         --retry 2 --connect-timeout 15 --max-time 120)
