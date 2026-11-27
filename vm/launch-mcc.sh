@@ -29,7 +29,7 @@ fi
 rm -f "$fifo"
 mkfifo -m 600 "$fifo"
 exec 3<> "$fifo"
-printf '[%(%H:%M:%S)T] [ALT-PILOT] MCC startup began for account %s\n' -1 "$slot"
+printf '[%(%H:%M:%S)T] [ALT-PILOT] MCC startup began for account %s (PID %s)\n' -1 "$slot" "$$"
 export DOTNET_BUNDLE_EXTRACT_BASE_DIR=/opt/alt-pilot/mcc/bundle-cache
 cd "$profile"
 exec "$profile/MinecraftClient" "$profile/MinecraftClient.ini" <&3

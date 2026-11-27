@@ -95,12 +95,19 @@ for slot in {1..10}; do
 
   # During login a TCP socket may exist without the client reaching Minecraft.
   # Once the launch marker leaves the recent log, don't require it for old sessions.
-  if [[ "$edition" != bedrock && "$connected" == true && "$(cat "$connected_marker" 2>/dev/null || true)" != "$active_mono" ]]; then
+  if [[ "$edition" != bedrock && "$(cat "$connected_marker" 2>/dev/null || true)" != "$active_mono" ]]; then
     log_file=/opt/alt-pilot/logs/afk.log
     if [[ "$slot" != 1 ]]; then log_file="/opt/alt-pilot/logs/afk-${slot}.log"; fi
     recent="$(tail -n 500 "$log_file" 2>/dev/null | tac | sed '/\[ALT-PILOT\] MCC startup began/q' | tac || true)"
     if [[ "$recent" == *'[ALT-PILOT] MCC startup began'* && "$recent" != *'Server was successfully joined'* ]]; then
       connected=false
+    fi
+    if [[ "$connected" == false && "$recent" == *'[ALT-PILOT] MCC startup began'* ]] && (( age < 1200 )); then
+      # Let MCC's device code expire on its own instead of replacing it after two minutes.
+      last_login_event="$(grep -E 'Waiting for authentication to complete|Microsoft authenticate failed:|Login failed :|Using Minecraft version|Unknown or not supported MC version|Checking if server is running Forge|Retrieving Server Info' <<<"$recent" | tail -n 1 || true)"
+      if [[ "$last_login_event" == *'Waiting for authentication to complete'* ]]; then
+        continue
+      fi
     fi
   fi
 

@@ -305,9 +305,13 @@ def main():
             log.replace(root / 'login.previous.log')
         with log.open('w') as out:
             captured = []
+            java_session_written = False
             def emit(text):
+                nonlocal java_session_written
                 captured.append(text)
                 clean = redact(text)
+                if edition == 'java' and clean.strip().endswith('Server IP :'):
+                    java_session_written = True
                 # Device codes belong only in the live response, not the retained log.
                 saved = re.sub(r'https://(?:www\.)?microsoft.com/\S+', '[Microsoft sign-in URL]', clean)
                 saved = re.sub(r'(?i)(?:code\s*[:=]?\s*)[A-Z0-9-]{6,16}', 'code [removed]', saved)
@@ -323,13 +327,16 @@ def main():
                     profile = root / 'mcc'
                     config = (profile / 'MinecraftClient.ini').read_text()
                     config = re.sub(r'^Account = .*$', 'Account = { Login = "", Password = "" }', config, flags=re.M)
+                    # MCC asks for a server only after it has finished writing
+                    # the session cache. Stop there instead of joining during Add.
+                    config = re.sub(r'^Server = .*$', 'Server = { Host = "" }', config, flags=re.M)
                     config = config.replace('ExitOnFailure = false', 'ExitOnFailure = true')
                     config = config.replace('[ChatBot.AutoRelog]\nEnabled = true', '[ChatBot.AutoRelog]\nEnabled = false')
                     login_config = profile / 'Login.ini'
                     login_config.write_text(config)
                     try:
-                        code = stream([str(profile / 'MinecraftClient'), str(login_config)], profile, emit,
-                                      success=lambda: bool(java_name(profile)), input_data=b'2\n')
+                        stream([str(profile / 'MinecraftClient'), str(login_config)], profile, emit,
+                               success=lambda: java_session_written, input_data=b'2\n')
                     finally:
                         login_config.unlink(missing_ok=True)
                     name = java_name(profile)

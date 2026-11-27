@@ -107,14 +107,12 @@ if [[ -f "$config" ]]; then
   found="$(grep -E '^[[:space:]]*Account[[:space:]]*=[[:space:]]*\{' "$config" | head -1 || true)"
   [[ -n "$found" ]] && account_line="$found"
 fi
-# Device-code sign-in uses a temporary INI. MCC saves its session under the
-# Minecraft profile name, so seed an empty runtime login from this slot's cache.
-# Otherwise MCC waits for an interactive authentication selection on the FIFO.
-if [[ "$account_line" == 'Account = { Login = "", Password = "" }' && -s "$profile/SessionCache.db" ]]; then
-  profile_name="$(/usr/local/bin/afk-mcc-profile-name "$profile/SessionCache.db")"
-  if [[ "$profile_name" =~ ^[A-Za-z0-9_]{3,16}$ ]]; then
-    account_line="Account = { Login = \"$profile_name\", Password = \"\" }"
-  fi
+managed_account='Password[[:space:]]*=[[:space:]]*""'
+if [[ "$account_line" =~ $managed_account && -s "$profile/SessionCache.db" ]]; then
+  # Recover the login key MCC saved during Add, including on existing slots
+  # seeded with the Java profile name on v1.0.1.
+  cached_account="$(/usr/local/bin/afk-mcc-profile-name "$profile/SessionCache.db" --account-line)"
+  account_line="${cached_account:-$account_line}"
 fi
 
 tmp="$(mktemp "$profile/MinecraftClient.ini.XXXXXX")"

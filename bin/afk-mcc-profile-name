@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Print the Minecraft profile name that belongs to one MCC session cache.
+# Print the Minecraft profile name or recover the TOML account setting for one MCC session cache.
 #
 # MCC stores the cache as MessagePack. The Minecraft services token inside it
 # carries the profile ("pfd") of the account that signed in, so it is the only
@@ -8,6 +8,52 @@ set -Eeuo pipefail
 
 cache="${1:-}"
 [[ -n "$cache" && -s "$cache" ]] || exit 0
+
+if [[ "${2:-}" == --account-line ]]; then
+  # The first entry of MCC's per-slot MessagePack map holds the login key.
+  # MCC uses the Microsoft email when supplied, or the Java profile name.
+  exec python3 - "$cache" <<'PY'
+import json
+import sys
+
+try:
+    with open(sys.argv[1], 'rb') as cache:
+        def read_int(size):
+            data = cache.read(size)
+            if len(data) != size:
+                raise ValueError('Incomplete MCC cache')
+            return int.from_bytes(data, 'big')
+
+        header = read_int(1)
+        if header in (0xde, 0xdf):
+            entries = read_int(2 if header == 0xde else 4)
+        elif 0x80 <= header <= 0x8f:
+            entries = header - 0x80
+        else:
+            entries = 0
+        if not entries:
+            sys.exit(0)
+
+        header = read_int(1)
+        if 0xa0 <= header <= 0xbf:
+            length = header - 0xa0
+        elif header in (0xd9, 0xda, 0xdb):
+            length = read_int({0xd9: 1, 0xda: 2, 0xdb: 4}[header])
+        else:
+            sys.exit(0)
+        if not 0 < length <= 1024:
+            sys.exit(0)
+        data = cache.read(length)
+        if len(data) != length:
+            sys.exit(0)
+        login = data.decode('utf-8')
+except (OSError, ValueError):
+    sys.exit(0)
+
+if login.strip() and login.isprintable():
+    print('Account = { Login = ' + json.dumps(login, ensure_ascii=False) + ', Password = "" }')
+PY
+fi
 
 token="$(grep -aoE 'eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+' "$cache" | head -1 || true)"
 [[ -n "$token" ]] || exit 0

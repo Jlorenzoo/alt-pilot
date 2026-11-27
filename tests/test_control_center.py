@@ -205,6 +205,53 @@ class HealthScriptTests(unittest.TestCase):
             missing = subprocess.run(["bash", str(helper), str(Path(directory) / "absent.db")], text=True, capture_output=True, check=True)
             self.assertEqual(missing.stdout, "")
 
+    def test_java_startup_signin_code_is_only_reported_for_the_current_prompt(self):
+        root = Path(__file__).parents[1]
+        with tempfile.TemporaryDirectory() as sandbox:
+            directory = Path(sandbox)
+            profile = directory / "slots" / "2" / "mcc"
+            profile.mkdir(parents=True)
+            (profile / "SessionCache.db").write_bytes(b"saved session")
+            log = directory / "afk-2.log"
+            health = (root / "bin" / "afk-health-json").read_text(encoding="utf-8")
+            health = health.replace("/home/mc/slots/", f"{directory.as_posix()}/slots/")
+            health = health.replace("/opt/alt-pilot/logs/", f"{directory.as_posix()}/")
+            health = health.replace("/run/alt-pilot-connected-", f"{directory.as_posix()}/connected-")
+            meminfo = directory / "meminfo"
+            meminfo.write_text("MemTotal: 1024 kB\nMemAvailable: 768 kB\nSwapTotal: 2048 kB\nSwapFree: 2048 kB\n", encoding="utf-8")
+            health = health.replace("/proc/meminfo", f'"{meminfo.as_posix()}"')
+            runner = directory / "health"
+            health = health.replace("\naccounts='[]'", """
+systemctl() { printf 'ActiveState=active\\nMainPID=1234\\n'; }
+ss() { :; }
+df() { printf 'Used\\n1024\\n'; }
+mcc_profile_name() { echo java_player; }
+accounts='[]'""", 1)
+            runner.write_text(health, encoding="utf-8")
+
+            def probe(start_pid, following=""):
+                log.write_text(
+                    f"[10:50:23] [ALT-PILOT] MCC startup began for account 2 (PID {start_pid})\n"
+                    "10:50:26 Connecting to Microsoft...\n"
+                    "10:50:27 To sign in, open https://www.microsoft.com/link in your browser and enter the code: \x1b[93mLIVE1234\x1b[0m\n"
+                    "10:50:27 Waiting for authentication to complete...\n" + following,
+                    encoding="utf-8",
+                )
+                result = subprocess.run(["bash", str(runner)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return json.loads(result.stdout)["accounts"][0]
+
+            waiting = probe(1234)
+            self.assertEqual(waiting["startup_phase"], "microsoft_signin")
+            self.assertEqual(waiting["device_code"], "LIVE1234")
+            expired = probe(1234, "10:51:40 Microsoft authenticate failed: Device code authentication timed out.\n")
+            self.assertEqual(expired["startup_phase"], "microsoft_signin_failed")
+            self.assertNotIn("device_code", expired)
+            joining = probe(1234, "10:51:40 Using Minecraft version 26.2 (protocol v776)\n")
+            self.assertNotEqual(joining["startup_phase"], "microsoft_signin")
+            self.assertNotIn("device_code", joining)
+            self.assertNotIn("device_code", probe(1233))
+
     def test_console_helper_is_selected_and_bounded(self):
         root = Path(__file__).parents[1]
         script = root / "bin" / "afk-console-log"
@@ -231,6 +278,7 @@ class HealthScriptTests(unittest.TestCase):
                 "Resolving eu.mc-complex.com...\n"
                 "Minecraft Console Client v26.2 - for MC 1.4.6 to 26.2 - Github.com/MCCTeam\n"
                 "10:50:26 GitHub build 511, built on 2026-08-29 from commit fbfae5b\n"
+                "10:50:26 To sign in, open https://www.microsoft.com/link in your browser and enter the code: OLD1234\n"
                 "10:50:27 Cached session is still valid for JLorenzo.\n"
                 "10:50:27 Using Minecraft version 1.12.2 (protocol v340)\n"
                 "Checking if server is running Forge...\n"
@@ -271,6 +319,7 @@ class HealthScriptTests(unittest.TestCase):
             self.assertNotIn("Players: 985/3000", joined)
             self.assertNotIn("Minecraft Console Client v26.2", joined)
             self.assertNotIn("Link: http://mc-complex.com", joined)
+            self.assertNotIn("OLD1234", joined)
             self.assertLessEqual(len(lines), 120)
 
             # A legacy command from the previous clock cycle must not displace
@@ -448,7 +497,7 @@ class PasswordTests(unittest.TestCase):
                 self.assertFalse(remote_control.verify_password(password + "wrong"))
 
     def test_remote_health_timeout_returns_valid_stale_status(self):
-        cached = {"reachable": True, "accounts": [{"slot": 1, "service": "active"}]}
+        cached = {"reachable": True, "accounts": [{"slot": 1, "service": "active", "device_code": "LIVE1234"}]}
         with patch.object(remote_control, "_HEALTH_CACHE", cached), \
              patch.object(remote_control, "_HEALTH_CACHE_AT", 0.0), \
              patch.object(remote_control, "command", side_effect=subprocess.TimeoutExpired("health", 20)):
@@ -456,6 +505,7 @@ class PasswordTests(unittest.TestCase):
         self.assertTrue(result["reachable"])
         self.assertTrue(result["health_stale"])
         self.assertIn("delayed", result["health_note"])
+        self.assertEqual(result["accounts"], [{"slot": 1, "service": "active"}])
 
     def test_fresh_remote_health_never_uses_stale_accounts_for_login(self):
         cached = {"reachable": True, "accounts": [{"slot": 1, "authenticated": True}]}
@@ -1199,8 +1249,8 @@ class AccountSettingsTests(unittest.TestCase):
             prepare_text = prepare_script.read_text(encoding="utf-8")
             patched_prepare = prepare_text.replace("/home/mc/slots/", f"{slots_dir.as_posix()}/")
             patched_prepare = patched_prepare.replace("source_binary=/opt/alt-pilot/mcc/disk/MinecraftClient", f"source_binary={fake_binary.as_posix()}")
-            patched_prepare = patched_prepare.replace("item_controls_source=/opt/alt-pilot/mcc/item-controls.cs", "item_controls_source=" + str(Path(__file__).resolve().parents[1] / "vm/item-controls.cs"))
-            patched_prepare = patched_prepare.replace("/usr/local/bin/afk-mcc-profile-name", str(root / "bin/afk-mcc-profile-name"))
+            patched_prepare = patched_prepare.replace("item_controls_source=/opt/alt-pilot/mcc/item-controls.cs", f'item_controls_source="{(root / "vm/item-controls.cs").as_posix()}"')
+            patched_prepare = patched_prepare.replace("/usr/local/bin/afk-mcc-profile-name", f'bash "{(root / "bin/afk-mcc-profile-name").as_posix()}"')
             patched_prepare = patched_prepare.replace('[[ "$(id -un)" == mc ]] || {', '[[ 1 == 1 ]] || {')
             prepare_runner = Path(sandbox) / "mcc-prepare"
             prepare_runner.write_text(patched_prepare, encoding="utf-8")
@@ -1236,17 +1286,20 @@ class AccountSettingsTests(unittest.TestCase):
             self.assertIn("[ChatBot.AutoRespond]\nEnabled = true", mcc_ini)
             self.assertIn('Matches_File = "matches.ini"', mcc_ini)
 
-            # An existing saved account can have a blank runtime login because
-            # device-code sign-in wrote to the temporary Login.ini instead.
-            payload = base64.urlsafe_b64encode(json.dumps({"pfd": [{"type": "mc", "name": "ExistingAlt"}]}).encode()).rstrip(b"=")
+            # v1.0.1 seeded the profile name even when MCC cached the email.
+            # Repair that managed configuration without changing the session.
+            config_file = mcc_dir / "MinecraftClient.ini"
+            config_file.write_text(mcc_ini.replace('Login = ""', 'Login = "ExistingAlt"'), encoding="utf-8")
             cache = mcc_dir / "SessionCache.db"
-            cache.write_bytes(b"eyJhbGciOiJSUzI1NiJ9." + payload)
+            login = b"minecraft.java.player@example.com"
+            session = b"\x81\xd9" + bytes([len(login)]) + login + b"\x97"
+            cache.write_bytes(session)
             (mcc_dir / "to_skyblock.txt").write_text("send /skyblock\n")
             subprocess.run(["bash", runner.as_posix(), str(slot), "0", "5", "/home alt", "1", "DiddlyNoodle, jlorenzoo", "spawner"], capture_output=True, text=True, check=True, env=env)
             subprocess.run(["bash", prepare_runner.as_posix(), str(slot)], capture_output=True, text=True, check=True)
-            self.assertIn('Account = { Login = "ExistingAlt", Password = "" }',
-                          (mcc_dir / "MinecraftClient.ini").read_text(encoding="utf-8"))
-            self.assertEqual(cache.read_bytes(), b"eyJhbGciOiJSUzI1NiJ9." + payload)
+            self.assertIn(f'Account = {{ Login = "{login.decode()}", Password = "" }}',
+                          config_file.read_text(encoding="utf-8"))
+            self.assertEqual(cache.read_bytes(), session)
             self.assertFalse((mcc_dir / "startup.txt").exists())
             self.assertFalse((mcc_dir / "to_skyblock.txt").exists())
             disabled_matches = (mcc_dir / "matches.ini").read_text(encoding="utf-8")

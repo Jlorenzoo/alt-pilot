@@ -35,6 +35,8 @@ tail -n 800 "$game_log" 2>/dev/null \
           next
         }
         message = substr(line, RLENGTH + 1)
+        # Live device codes are available in account status, outside history.
+        if (message ~ /To sign in, open .* in your browser and enter the code:/) next
         if (message ~ /^Link: /) next
         sequence += 1
         event_epoch = now_epoch - (clock_seconds(now_clock) - clock_seconds(stamp))

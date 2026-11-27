@@ -1451,3 +1451,7 @@ input, select { border-radius: 7px; background: var(--surface-2); }
   .topbar .settings-tab { min-height: 40px; }
 }
 .communication-panel .communication-form { grid-template-columns: minmax(0, 1fr) auto auto; }
+
+.startup-sign-in { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin-top: 16px; }
+.startup-sign-in a { display: inline-flex; align-items: center; text-decoration: none; }
+.startup-sign-in code { font-weight: 700; user-select: all; }

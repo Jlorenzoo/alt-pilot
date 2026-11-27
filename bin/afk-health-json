@@ -23,6 +23,7 @@ unit_json() {
   local slot="$1" unit="$2"
   local active="" enabled="" pid="" mem="" since="" active_mono="" now_mono startup_seconds=0 authenticated=false name="" connected=false communication_ready=false cgroup="" socket_pids="" process_pid=""
   local result="" exit_status="" restart_count="" startup_phase="launcher" edition="java" xuid="" log_file="" recent_log="" connection_marker="" marker_start="" properties="" mcc_cache="" connection_state=""
+  local auth_phase device_code=""
   if [[ "$slot" == 1 ]]; then
     log_file=/opt/alt-pilot/logs/afk.log
   else
@@ -84,6 +85,31 @@ unit_json() {
     elif grep -Eq 'Connecting to|Checking Session|Launching version|\[Client thread/' <<<"$recent_log"; then
       startup_phase="loading"
     fi
+    # Only expose prompts from the current Java launch, before server output.
+    if [[ "$edition" == java && "$connected" == false && "$pid" != 0 ]] &&
+       grep -Eq "^\[[0-9:]+\] \[ALT-PILOT\] MCC startup began for account $slot \(PID $pid\)$" <<<"$recent_log"; then
+      read -r auth_phase device_code <<<"$(awk '
+        {
+          sub(/\r$/, "")
+          gsub(/\033\[[0-?]*[ -\/]*[@-~]/, "")
+          sub(/^\[[0-9:]+\] +|^[0-9:]+ +/, "")
+        }
+        /^(Cached session is still valid|Using Minecraft version|Unknown or not supported MC version|Checking if server is running Forge|Retrieving Server Info|Server version:)/ {
+          phase = code = ""
+          exit
+        }
+        /^Connecting to Microsoft\.\.\.$/ { phase = code = ""; signing_in = 1 }
+        signing_in && /^To sign in, open https:\/\/(www\.)?microsoft\.com\/(link|devicelogin)(\?[^[:space:]]+)? in your browser and enter the code: [A-Z0-9-]+ *$/ {
+          code = $NF
+          if (length(code) < 6 || length(code) > 16) code = ""
+        }
+        signing_in && /^Waiting for authentication to complete\.\.\.$/ { phase = "microsoft_signin" }
+        signing_in && /^(Microsoft authenticate failed:|Login failed :)/ { phase = "microsoft_signin_failed"; code = "" }
+        END { print phase, code }
+      ' <<<"$recent_log")"
+      [[ -z "$auth_phase" ]] || startup_phase="$auth_phase"
+      [[ "$startup_phase" == microsoft_signin ]] || device_code=""
+    fi
   fi
   if [[ "$edition" == bedrock && "$active" == active ]]; then
     connected=false
@@ -95,7 +121,7 @@ unit_json() {
     marker_start="$(cat "$connection_marker" 2>/dev/null || true)"
     if [[ "$connection_state" == delayed || "$connection_state" == unresponsive ]]; then
       startup_phase="$connection_state"
-    elif [[ "$marker_start" == "$active_mono" ]]; then startup_phase="disconnected"; fi
+    elif [[ "$marker_start" == "$active_mono" && "$startup_phase" != microsoft_signin* ]]; then startup_phase="disconnected"; fi
   fi
   if [[ "$connected" == true && -p "/home/mc/slots/${slot}/control.fifo" ]]; then
     communication_ready=true
@@ -112,13 +138,13 @@ unit_json() {
     parsed_settings="$(jq -c '{startup_command_enabled: (.startup_command_enabled == true), startup_command: (.startup_command // "/home alt"), startup_delay: (.startup_delay // 5), anti_afk: (.anti_afk == true), tpa_auto_accept: (.tpa_auto_accept == true), tpa_whitelist: (.tpa_whitelist // ""), purpose: (.purpose // "")}' <<<"$raw_settings" 2>/dev/null || true)"
     [[ -n "$parsed_settings" ]] && slot_settings_json="$parsed_settings"
   fi
-  jq -n --argjson slot "$slot" --arg unit "$unit" --arg name "$name" \
+  jq -Rn --argjson slot "$slot" --arg unit "$unit" --arg name "$name" \
     --arg connection_state "$connection_state" --arg edition "$edition" --arg xuid "$xuid" --arg service "$active" --arg enabled "$enabled" --arg since "$since" --arg result "$result" --arg startup_phase "$startup_phase" \
     --argjson authenticated "$authenticated" --argjson connected "$connected" --argjson communication_ready "$communication_ready" \
     --argjson pid "$pid" --argjson memory_bytes "$mem" --argjson startup_seconds "$startup_seconds" \
     --argjson exit_status "$exit_status" --argjson restart_count "$restart_count" \
     --argjson settings "$slot_settings_json" \
-    '{slot:$slot,unit:$unit,name:$name,edition:$edition,xuid:$xuid,authenticated:$authenticated,service:$service,enabled:$enabled,connected:$connected,connection_state:$connection_state,communication_ready:$communication_ready,pid:$pid,memory_bytes:$memory_bytes,since:$since,startup_seconds:$startup_seconds,startup_phase:$startup_phase,result:$result,exit_status:$exit_status,restart_count:$restart_count,settings:$settings}'
+    '{slot:$slot,unit:$unit,name:$name,edition:$edition,xuid:$xuid,authenticated:$authenticated,service:$service,enabled:$enabled,connected:$connected,connection_state:$connection_state,communication_ready:$communication_ready,pid:$pid,memory_bytes:$memory_bytes,since:$since,startup_seconds:$startup_seconds,startup_phase:$startup_phase,result:$result,exit_status:$exit_status,restart_count:$restart_count,settings:$settings} + (input | if length > 0 then {device_code: .} else {} end)' <<<"$device_code"
 }
 
 accounts='[]'
@@ -126,7 +152,7 @@ append_account() {
   local item
   item="$(unit_json "$@")"
   if jq -e '.authenticated and (.name | length > 0)' <<<"$item" >/dev/null; then
-    accounts="$(jq -nc --argjson accounts "$accounts" --argjson item "$item" '$accounts + [$item]')"
+    accounts="$(jq -sc '.[0] + [.[1]]' <<<"$accounts"$'\n'"$item")"
   fi
 }
 
@@ -144,14 +170,14 @@ swap_free="$(awk '/SwapFree/{print $2*1024}' /proc/meminfo)"
 disk="$(df -B1 --output=used / | tail -1 | tr -d ' ')"
 installed=false; command -v alt-pilot-mcc-run >/dev/null 2>&1 && installed=true
 
-jq -nc --argjson accounts "$accounts" --argjson installed "$installed" \
+jq -c --argjson installed "$installed" \
   --argjson memory_total "$mem_total" --argjson memory_available "$mem_avail" \
   --argjson swap_total "$swap_total" --argjson swap_used "$((swap_total-swap_free))" \
   --argjson disk_used "$disk" --arg version "$MC_VERSION" --arg server "$MC_SERVER" \
   --arg heap_min "$JVM_HEAP_XMS" --arg heap_max "$JVM_HEAP_XMX" \
-  '($accounts[0] // {authenticated:false,service:"inactive",enabled:"disabled",connected:false,pid:0,memory_bytes:0,since:""}) as $primary |
+  '. as $accounts | ($accounts[0] // {authenticated:false,service:"inactive",enabled:"disabled",connected:false,pid:0,memory_bytes:0,since:""}) as $primary |
    {reachable:true,installed:$installed,slots_supported:true,max_accounts:10,max_online:5,accounts:$accounts,
     authenticated:$primary.authenticated,service:$primary.service,enabled:$primary.enabled,connected:$primary.connected,
     pid:$primary.pid,memory_bytes:$primary.memory_bytes,since:$primary.since,
     memory_total:$memory_total,memory_available:$memory_available,swap_total:$swap_total,swap_used:$swap_used,disk_used:$disk_used,
-    settings:{ssh_user:"ubuntu",minecraft_version:$version,minecraft_server:$server,heap_min:$heap_min,heap_max:$heap_max}}'
+    settings:{ssh_user:"ubuntu",minecraft_version:$version,minecraft_server:$server,heap_min:$heap_min,heap_max:$heap_max}}' <<<"$accounts"
