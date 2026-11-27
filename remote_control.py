@@ -230,19 +230,22 @@ def health(fresh: bool = False) -> dict:
             else:
                 current = core.aggregate_health(list(zip(hosts, currents)))
             if not fresh and not current.get("reachable") and _HEALTH_CACHE:
-                stale = dict(_HEALTH_CACHE)
-                stale["health_stale"] = True
-                stale["health_note"] = "Status refresh is delayed; showing the last successful check."
-                return stale
+                return stale_health()
             _HEALTH_CACHE, _HEALTH_CACHE_AT = current, time.monotonic()
             return dict(current)
         except (subprocess.TimeoutExpired, RuntimeError, json.JSONDecodeError, IndexError) as exc:
             if not fresh and _HEALTH_CACHE:
-                stale = dict(_HEALTH_CACHE)
-                stale["health_stale"] = True
-                stale["health_note"] = "Status refresh is delayed; showing the last successful check."
-                return stale
+                return stale_health()
             return {"reachable": False, "reason": f"Status refresh delayed: {exc}"}
+
+
+def stale_health() -> dict:
+    stale = dict(_HEALTH_CACHE)
+    stale["health_stale"] = True
+    stale["health_note"] = "Status refresh is delayed; showing the last successful check."
+    if "accounts" in stale:
+        stale["accounts"] = [{k: v for k, v in account.items() if k != "device_code"} for account in stale["accounts"]]
+    return stale
 
 
 def remote_summary(include_oci: bool = False) -> dict:

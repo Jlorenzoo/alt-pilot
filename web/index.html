@@ -7,7 +7,7 @@
   <title>ALT Pilot — 24/7 MC-alts</title>
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="alternate icon" href="/favicon.ico">
-  <link rel="stylesheet" href="/styles.css?v=20261121headerupdate">
+  <link rel="stylesheet" href="/styles.css?v=20261127javasignin">
   <link rel="stylesheet" href="/workspace.css?v=20261029sharedaccounts1">
 </head>
 <body>
@@ -167,6 +167,10 @@
                 <div id="connectionPill" class="state-pill neutral"><span></span><span data-i18n="status_checking">Checking</span></div>
                 <h2 id="connectionTitle" data-i18n="status_reading_vm">Reading the VM</h2>
                 <p id="connectionDescription" data-i18n="status_reading_desc">This usually takes a few seconds.</p>
+                <div id="startupSignIn" class="startup-sign-in hidden">
+                  <a id="startupSignInLink" class="button primary" target="_blank" rel="noopener noreferrer" data-i18n="auth_open_microsoft">Open Microsoft sign-in</a>
+                  <span><span data-i18n="auth_code_label">One-time code</span> <code id="startupSignInCode"></code></span>
+                </div>
               </div>
             </div>
             <aside class="connection-presence" aria-label="Selected account connection status">
@@ -500,7 +504,7 @@
                   <div class="panel-heading"><div><p class="section-kicker" data-i18n="settings_kicker_client">Minecraft client</p><h3 data-i18n="settings_h3_connection">Connection details</h3><p data-i18n="settings_connection_sub">Use the Java server address and the exact Minecraft version it supports.</p></div></div>
                   <div class="field-row">
                     <label><span data-i18n="settings_server_label">Minecraft server</span><input id="serverInput" name="minecraft_server" autocomplete="off" placeholder="play.example.net or play.example.net:25565" required><small data-i18n="settings_server_small">Use the server's direct Java address. A port is optional.</small></label>
-                    <label><span data-i18n="settings_version_label">Minecraft version</span><input id="versionInput" name="minecraft_version" autocomplete="off" required><small data-i18n="settings_version_small">1.12.2 uses little memory, but the selected version must support a real connection.</small></label>
+                    <label><span data-i18n="settings_version_label">Minecraft version</span><input id="versionInput" name="minecraft_version" autocomplete="off" required><small data-i18n="settings_version_small">The bundled MCC supports Java versions up to 26.2. Choose a version the server accepts.</small></label>
                   </div>
                 </section>
                 <section id="settings-account" class="panel form-panel hidden" data-tab-panel="account" role="tabpanel">
@@ -798,8 +802,8 @@
   </div>
 
   <script src="/console-format.js?v=8"></script>
-  <script src="/i18n.js?v=20261121headerupdate"></script>
-  <script src="/app.js?v=20261121headerupdate"></script>
+  <script src="/i18n.js?v=20261127javasignin"></script>
+  <script src="/app.js?v=20261127javasignin"></script>
   <script src="/availability.js?v=20261029sharedaccounts1"></script>
 </body>
 </html>

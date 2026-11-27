@@ -241,6 +241,9 @@ function render() {
   const active = r.service === 'active';
   const connected = Boolean(r.connected);
   const reachable = Boolean(r.reachable);
+  const waitingForSignIn = active && !connected && r.startup_phase === 'microsoft_signin';
+  const signInCode = waitingForSignIn && reachable && !global.health_stale
+    && /^[A-Z0-9-]{6,16}$/.test(r.device_code || '') ? r.device_code : '';
   $('#serverValue').textContent = settings.minecraft_server || '—';
   $('#versionValue').textContent = settings.minecraft_version || '—';
   $('#accountValue').textContent = r.name || 'No account added';
@@ -285,6 +288,19 @@ function render() {
     labelKey = null; labelDefault = 'Client heartbeat delayed';
     titleKey = null; titleDefault = 'The client is not updating its status';
     descKey = null; descDefault = 'The server may still show this player online. Recovery waits for a sustained failure before restarting.';
+  } else if (waitingForSignIn) {
+    mood = 'warning';
+    labelKey = 'status_pill_signin_needed'; labelDefault = 'Sign-in needed';
+    titleKey = 'startup_signin_waiting'; titleDefault = 'Waiting for Microsoft sign-in';
+    descKey = signInCode ? 'startup_signin_approve' : 'startup_signin_code_unavailable';
+    descDefault = signInCode
+      ? 'Choose the Microsoft account for this Java profile and approve the one-time code. The client will continue automatically.'
+      : 'Refresh for the latest sign-in code, or restart this account to request a new one.';
+  } else if (active && r.startup_phase === 'microsoft_signin_failed') {
+    mood = 'error';
+    labelKey = 'status_pill_start_failed'; labelDefault = 'Start failed';
+    titleKey = 'startup_signin_failed'; titleDefault = 'Microsoft sign-in failed';
+    descKey = 'startup_signin_retry'; descDefault = 'Restart this account to try Microsoft sign-in again.';
   } else if (active && r.startup_phase === 'disconnected') {
     mood = 'error';
     labelKey = 'status_pill_connection_dropped'; labelDefault = 'Connection dropped';
@@ -340,6 +356,11 @@ function render() {
   $('#connectionPill').innerHTML = `<span></span>${label}`;
   $('#connectionTitle').textContent = title;
   $('#connectionDescription').textContent = description;
+  $('#startupSignIn').classList.toggle('hidden', !signInCode);
+  $('#startupSignInCode').textContent = signInCode;
+  const signInLink = $('#startupSignInLink');
+  if (signInCode) signInLink.href = microsoftSignInUrl(signInCode);
+  else signInLink.removeAttribute('href');
 
   const detailKey = connected ? 'conn_detail_connected' : active ? 'conn_detail_active' : 'conn_detail_controls';
   const detailDefault = connected
@@ -409,7 +430,9 @@ function renderAccounts(global, local) {
     const isCustom = Boolean(rawPurpose && !/^[Aa]lt[[:space:]_]*[0-9]+$/i.test(rawPurpose));
     const purposeHtml = `<small class="account-tab-purpose${isCustom ? ' is-custom' : ''}">${escapeHtml(purpose)}</small>`;
     const draggable = accounts.length > 1 ? ' draggable="true"' : '';
-    const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
+    const statusLabel = active && !account.connected && account.startup_phase === 'microsoft_signin'
+      ? (typeof i18n !== 'undefined' ? i18n.t('startup_signin_waiting') : 'Waiting for Microsoft sign-in')
+      : status.charAt(0).toUpperCase() + status.slice(1);
     const optionsHint = typeof i18n !== 'undefined' && i18n.getLang() === 'it' ? 'Tasto destro per opzioni' : 'Right-click for options';
     const isPrimary = accountIdentity(account) === app.primaryAccount;
     const title = `${isPrimary ? 'Primary account · ' : ''}${account.name || defaultAltLabel} [${purpose}] · ${statusLabel} · ${optionsHint}${accounts.length > 1 ? ' — Drag to reorder' : ''}`;
@@ -702,6 +725,7 @@ function renderCommunication(d) {
   }
   if (app.consoleSlot !== app.selectedSlot) {
     app.consoleSlot = app.selectedSlot;
+    app.consoleStartupPhase = d.selected?.startup_phase;
     app.consoleFilter = loadConsoleFilter(app.selectedSlot);
     app.consoleSearch = '';
     const search = $('#consoleSearch');
@@ -710,6 +734,9 @@ function renderCommunication(d) {
     renderActivityFeed($('#consoleOutput'), app.consoleLines);
     scrollConsoleToBottom($('#consoleOutput'));
     refreshConsole(true);
+  } else if (app.consoleStartupPhase !== d.selected?.startup_phase) {
+    app.consoleStartupPhase = d.selected?.startup_phase;
+    renderActivityFeed($('#consoleOutput'), app.consoleLines);
   }
 }
 
@@ -776,11 +803,18 @@ function renderActivityFeed(output, lines) {
       const delayed = ['delayed', 'unresponsive'].includes(account.connection_state);
       const dropped = account.startup_phase === 'disconnected';
       const elapsed = formatDuration(account.startup_seconds || 0);
+      const isI18n = typeof i18n !== 'undefined';
+      let message = `${account.startup_phase === 'joining' ? 'Joining server' : 'Loading Minecraft'} · ${elapsed}`;
+      if (dropped) message = 'Connection dropped. Automatic recovery is in progress.';
+      if (account.startup_phase === 'microsoft_signin') {
+        message = isI18n ? i18n.t('startup_signin_waiting') : 'Waiting for Microsoft sign-in';
+      } else if (account.startup_phase === 'microsoft_signin_failed') {
+        message = isI18n ? i18n.t('startup_signin_failed') : 'Microsoft sign-in failed';
+      }
+      const attention = dropped || account.startup_phase === 'microsoft_signin_failed';
       entries.push({
-        time: 'NOW', kind: dropped ? 'ATTENTION' : 'STARTUP', category: 'client', tone: dropped ? 'attention' : 'progress',
-        message: delayed ? 'Client heartbeat delayed; the server connection is not confirmed lost.' : dropped
-          ? 'Connection dropped. Automatic recovery is in progress.'
-          : `${account.startup_phase === 'joining' ? 'Joining server' : 'Loading Minecraft'} · ${elapsed}`
+        time: 'NOW', kind: attention ? 'ATTENTION' : 'STARTUP', category: 'client', tone: attention ? 'attention' : 'progress',
+        message
       });
     } else if (account.name && !account.connected) {
       entries.push({time: 'NOW', kind: 'OFFLINE', category: 'client', tone: 'client', message: 'Client stopped.'});

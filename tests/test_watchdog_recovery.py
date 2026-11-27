@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 class WatchdogRecoveryTests(unittest.TestCase):
     def run_watchdog(self, state, failed_at='0', reset_status='0', broken_helper=False,
                      bedrock_state=None, runs=1, armed=True, rejoining=False, uptime=1000,
-                     enabled='enabled', java_socket=False, previous_retry=False):
+                     enabled='enabled', java_socket=False, previous_retry=False, java_log=""):
         with tempfile.TemporaryDirectory() as folder:
             root = Path(folder)
             (root / 'slots/4').mkdir(parents=True)
@@ -24,8 +24,10 @@ class WatchdogRecoveryTests(unittest.TestCase):
                 (root / 'run/connected-4').write_text('1\n')
             if previous_retry:
                 (root / 'run/startup-retry-4').write_text('99 1\n')
-            if java_socket:
-                (root / 'afk-4.log').write_text('[10:00:00] [ALT-PILOT] MCC startup began for account 4\n')
+            if java_socket or java_log:
+                (root / 'afk-4.log').write_text(
+                    '[10:00:00] [ALT-PILOT] MCC startup began for account 4\n' + java_log,
+                )
             if bedrock_state:
                 (root / 'slots/4/account.json').write_text('{"edition":"bedrock"}')
             status_helper = root / 'bedrock-connected'
@@ -92,6 +94,18 @@ fi
     def test_java_tcp_socket_alone_does_not_complete_startup(self):
         self.assertEqual(self.run_watchdog('active', armed=False, java_socket=True, uptime=121),
                          ['try-restart --no-block alt-pilot@4.service'])
+
+    def test_java_device_signin_keeps_the_current_code_until_failure_or_timeout(self):
+        prompt = "10:00:05 Waiting for authentication to complete...\n"
+        self.assertEqual(self.run_watchdog('active', armed=False, java_log=prompt, uptime=121), [])
+        self.assertEqual(
+            self.run_watchdog('active', armed=False, java_log=prompt, uptime=1201),
+            ['try-restart --no-block alt-pilot@4.service'],
+        )
+        self.assertEqual(
+            self.run_watchdog('active', armed=False, java_log=prompt + "Microsoft authenticate failed: timed out\n", uptime=121),
+            ['try-restart --no-block alt-pilot@4.service'],
+        )
 
     def test_repeated_startup_failures_back_off(self):
         self.assertEqual(self.run_watchdog('active', armed=False, previous_retry=True, uptime=121), [])

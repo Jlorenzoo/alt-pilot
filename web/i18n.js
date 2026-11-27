@@ -159,6 +159,11 @@
       action_drop_item_title: 'Drop item held in hand to ground',
       console_joining_server: 'Joining server',
       console_loading_minecraft: 'Loading Minecraft',
+      startup_signin_waiting: 'Waiting for Microsoft sign-in',
+      startup_signin_approve: 'Choose the Microsoft account for this Java profile and approve the one-time code. The client will continue automatically.',
+      startup_signin_code_unavailable: 'Refresh for the latest sign-in code, or restart this account to request a new one.',
+      startup_signin_failed: 'Microsoft sign-in failed',
+      startup_signin_retry: 'Restart this account to try Microsoft sign-in again.',
 
       // Setup Steps Navigation
       setup_step_1_title: 'This computer',
@@ -273,7 +278,7 @@
       settings_server_label: 'Minecraft server',
       settings_server_small: 'Use the server\'s direct Java address. A port is optional.',
       settings_version_label: 'Minecraft version',
-      settings_version_small: '1.12.2 uses little memory, but the selected version must support a real connection.',
+      settings_version_small: 'The bundled MCC supports Java versions up to 26.2. Choose a version the server accepts.',
 
       // Settings - Account Tab
       settings_kicker_account: 'Per-Account Configuration',
@@ -717,6 +722,11 @@
       action_drop_item_title: "Getta a terra l'oggetto tenuto in mano",
       console_joining_server: 'Accesso al server in corso',
       console_loading_minecraft: 'Caricamento di Minecraft',
+      startup_signin_waiting: 'In attesa dell’accesso Microsoft',
+      startup_signin_approve: 'Scegli l’account Microsoft associato a questo profilo Java e conferma il codice monouso. Il client proseguirà automaticamente.',
+      startup_signin_code_unavailable: 'Aggiorna la pagina per vedere l’ultimo codice o riavvia questo account per richiederne uno nuovo.',
+      startup_signin_failed: 'Accesso Microsoft non riuscito',
+      startup_signin_retry: 'Riavvia questo account per riprovare l’accesso Microsoft.',
 
       // Setup Steps Navigation
       setup_step_1_title: 'Questo computer',
@@ -831,7 +841,7 @@
       settings_server_label: 'Server Minecraft',
       settings_server_small: 'Usa l\'indirizzo Java diretto del server. La porta è facoltativa.',
       settings_version_label: 'Versione Minecraft',
-      settings_version_small: 'La 1.12.2 consuma poca memoria, ma la versione selezionata deve supportare una connessione reale.',
+      settings_version_small: 'La versione di MCC inclusa supporta Java fino alla 26.2. Scegli una versione accettata dal server.',
 
       // Settings - Account Tab
       settings_kicker_account: 'Configurazione per account',

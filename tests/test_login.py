@@ -1,4 +1,5 @@
 import importlib.util
+import json
 import os
 from pathlib import Path
 try:
@@ -11,6 +12,7 @@ import sys
 import tempfile
 import time
 import unittest
+from unittest.mock import patch
 
 import control_center as core
 
@@ -20,6 +22,40 @@ spec.loader.exec_module(login)
 
 
 class LoginTests(unittest.TestCase):
+    def test_java_add_waits_for_mcc_to_finish_saving_before_stopping(self):
+        with tempfile.TemporaryDirectory() as directory:
+            slots = Path(directory)
+            profile = slots / '2' / 'mcc'
+            profile.mkdir(parents=True)
+            cache = profile / 'SessionCache.db'
+            (profile / 'MinecraftClient.ini').write_text(
+                'Account = { Login = "", Password = "" }\nServer = { Host = "example.com" }\n',
+                encoding='utf-8',
+            )
+
+            def run_client(argv, cwd, emit, success, input_data):
+                self.assertEqual(cwd, profile)
+                self.assertEqual(input_data, b'2\n')
+                self.assertIn('Server = { Host = "" }', Path(argv[1]).read_text(encoding='utf-8'))
+                cache.write_bytes(b'partially written session')
+                self.assertFalse(success())
+                cache.write_bytes(b'complete session')
+                emit('10:51:40 Server IP : \n')
+                self.assertTrue(success())
+                return 0
+
+            with patch.object(login, 'Path', return_value=slots), \
+                 patch.object(login, 'fcntl'), patch.object(login.os, 'umask'), \
+                 patch.object(login.sys, 'argv', ['alt-pilot-login.py', '2', 'java']), \
+                 patch.object(login, 'cancel_login'), patch.object(login.subprocess, 'run'), \
+                 patch.object(login, 'java_name', side_effect=lambda _: 'JavaPlayer' if cache.exists() else ''), \
+                 patch.object(login, 'stream', side_effect=run_client), patch.object(login, 'print', create=True):
+                login.main()
+
+            self.assertEqual(json.loads((profile.parent / 'account.json').read_text(encoding='utf-8')),
+                             {'edition': 'java', 'name': 'JavaPlayer'})
+            self.assertFalse((profile / 'Login.ini').exists())
+
     def test_edition_validation(self):
         self.assertEqual(core.account_edition({'edition': 'bedrock'}), 'bedrock')
         self.assertEqual(core.account_edition({'edition': 'both'}), 'both')
