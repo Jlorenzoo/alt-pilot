@@ -863,11 +863,22 @@ let updateCheckedAt = 0;
 let updateMessageTimer;
 let vmUpdate = {};
 
+function renderUpdateControls(status) {
+  const showButton = Boolean(status.available_version) && !updateBusy && status.state !== 'running';
+  $('#updateButton').classList.toggle('hidden', !showButton);
+  $('#updateButton').disabled = !showButton;
+  $('#updatePanel').classList.toggle('hidden', !app.local?.remote_mode || (!showButton && !$('#updateMessage').textContent));
+}
+
 function showUpdateMessage(message, persistent = false) {
   clearTimeout(updateMessageTimer);
   const element = $('#updateMessage');
   element.textContent = message;
-  if (!persistent) updateMessageTimer = setTimeout(() => { element.textContent = ''; }, 6000);
+  renderUpdateControls(vmUpdate);
+  if (!persistent) updateMessageTimer = setTimeout(() => {
+    element.textContent = '';
+    renderUpdateControls(vmUpdate);
+  }, 6000);
 }
 
 function showUpdateStatus(status, showDetails = false) {
@@ -884,20 +895,22 @@ function showUpdateStatus(status, showDetails = false) {
   if (status.state === 'running' || showDetails) {
     showUpdateMessage(message.replace('{version}', status.version || ''), status.state === 'running');
   }
-  $('#updateButton').disabled = updateBusy || ['running', 'unavailable'].includes(status.state);
+  renderUpdateControls(status);
 }
 
 async function refreshUpdateStatus() {
   updateCheckedAt = Date.now();
   try {
+    const status = await api('/api/update');
+    if (updateBusy) return;
     const wasRunning = vmUpdate.state === 'running';
-    vmUpdate = await api('/api/update');
-    if (!updateBusy) showUpdateStatus(vmUpdate, wasRunning);
+    vmUpdate = status;
+    showUpdateStatus(vmUpdate, wasRunning);
   } catch {}
 }
 
 $('#updateButton').addEventListener('click', async () => {
-  if (updateBusy) return;
+  if (updateBusy || !vmUpdate.available_version) return;
   updateBusy = true;
   showUpdateStatus({ state: 'running' });
   try {
@@ -919,7 +932,10 @@ $('#updateButton').addEventListener('click', async () => {
       if (!vmUpdate.attempt || vmUpdate.state === 'running') continue;
       if (vmUpdate.attempt === before.attempt && before.state !== 'running') continue;
       showUpdateStatus(vmUpdate, true);
-      if (vmUpdate.state === 'updated') location.reload();
+      if (vmUpdate.state === 'updated') {
+        try { sessionStorage.setItem('afk-update-complete', vmUpdate.version); } catch {}
+        location.reload();
+      }
       return;
     }
     showUpdateMessage('Check the update status again in a moment.');
@@ -927,7 +943,7 @@ $('#updateButton').addEventListener('click', async () => {
     showUpdateMessage(error.message);
   } finally {
     updateBusy = false;
-    $('#updateButton').disabled = ['running', 'unavailable'].includes(vmUpdate.state);
+    renderUpdateControls(vmUpdate);
   }
 });
 
@@ -945,8 +961,17 @@ function renderRemoteAccess(local) {
   }
   $('#logoutLink').classList.toggle('hidden', !local.remote_mode);
   $('#passwordPanel').classList.toggle('hidden', !(local.remote_mode || access.url) || !onRemoteTab);
-  $('#updatePanel').classList.toggle('hidden', !local.remote_mode);
-  if (local.remote_mode && !updateBusy && Date.now() - updateCheckedAt > 5000) refreshUpdateStatus();
+  if (local.remote_mode) {
+    try {
+      const updatedVersion = sessionStorage.getItem('afk-update-complete');
+      if (updatedVersion) {
+        sessionStorage.removeItem('afk-update-complete');
+        showUpdateStatus({ state: 'updated', version: updatedVersion }, true);
+      }
+    } catch {}
+    if (!updateBusy && Date.now() - updateCheckedAt > 5000) refreshUpdateStatus();
+  }
+  renderUpdateControls(vmUpdate);
   remoteUnavailable?.classList.toggle('hidden', Boolean(local.remote_mode || access.url) || !onRemoteTab);
   $('#settingsSaveActions')?.classList.toggle('hidden', onRemoteTab);
   $('#passwordMessage').textContent = local.remote_mode

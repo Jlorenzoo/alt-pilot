@@ -62,10 +62,10 @@ are kept.
 
 ## Update from the dashboard
 
-Select **Update** at the top right of the dashboard. The VM verifies the
-published release, keeps saved sign-ins and settings, and reloads the
-dashboard. Running Minecraft
-clients pick up updated runtime code on their next restart.
+When a newer release is available, select **Update** at the top right of the
+dashboard. The VM verifies the published release, keeps saved sign-ins and
+settings, and reloads the dashboard. Running Minecraft clients pick up updated
+runtime code on their next restart.
 
 Installations created before the update button need one in-place repair to
 add it. Paste this into the Oracle Cloud Shell used for setup.

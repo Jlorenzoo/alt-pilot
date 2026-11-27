@@ -50,6 +50,7 @@ mkdir "$stage/source"
 tar -xzf "$stage/release.tar.gz" --no-same-owner -C "$stage/source"
 python3 "$stage/source/vm/apply-release.py" "$stage/source"
 printf '%s\n' "$version" > "$stage/version"
+chmod 644 "$stage/version"
 mv -fT "$stage/version" "$state/version"
 installed="$version"
 write_status updated
