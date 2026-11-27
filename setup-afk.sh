@@ -232,8 +232,10 @@ tar -C "$SETUP_AFK_DIR" \
   || die "Secure copy was interrupted. Run the same installer again to continue."
 
 section "Running setup-vm.sh on VM"
+app_version="$(git -C "$SETUP_AFK_DIR" describe --tags --abbrev=0 --match 'v[0-9]*' 2>/dev/null || true)"
+[[ "$app_version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]] || app_version=""
 ssh -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o IdentityFile="${SSH_KEY%.pub}" \
-    "ubuntu@$PUB_IP" "sudo -n env AFK_REMOTE_ACCESS='$AFK_REMOTE_ACCESS' AFK_PUBLIC_IP='$PUB_IP' bash '$REMOTE_STAGE/vm/setup-vm.sh' && rm -rf '$REMOTE_STAGE'" || die "setup-vm.sh failed"
+    "ubuntu@$PUB_IP" "sudo -n env AFK_REMOTE_ACCESS='$AFK_REMOTE_ACCESS' AFK_PUBLIC_IP='$PUB_IP' AFK_APP_VERSION='$app_version' bash '$REMOTE_STAGE/vm/setup-vm.sh' && rm -rf '$REMOTE_STAGE'" || die "setup-vm.sh failed"
 
 section "Checking your dashboard"
 ssh -o IdentitiesOnly=yes -o BatchMode=yes -o IdentityFile="${SSH_KEY%.pub}" "ubuntu@$PUB_IP" \

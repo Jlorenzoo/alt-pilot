@@ -8,3 +8,13 @@ install -o root -g root -m 755 "$root/bin/alt-pilot-update-request" /usr/local/s
 install -o root -g root -m 644 "$root/service/alt-pilot-update.service" /etc/systemd/system/
 install -d -o root -g root -m 755 /var/lib/alt-pilot-update
 systemctl daemon-reload
+
+# Source installs record the latest included tag. Dashboard updates record
+# the exact release once its archive has been applied.
+if [[ "${AFK_APP_VERSION:-}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+  stamp="$(mktemp /var/lib/alt-pilot-update/version.XXXXXX)"
+  trap 'rm -f "$stamp"' EXIT
+  printf '%s\n' "$AFK_APP_VERSION" > "$stamp"
+  chmod 644 "$stamp"
+  mv -fT "$stamp" /var/lib/alt-pilot-update/version
+fi

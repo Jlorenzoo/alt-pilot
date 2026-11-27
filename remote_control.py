@@ -10,6 +10,7 @@ import hmac
 import ipaddress
 import json
 import os
+import re
 import secrets
 import subprocess
 import tempfile
@@ -20,6 +21,7 @@ from http import HTTPStatus
 from http.cookies import SimpleCookie
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
+from urllib.request import urlopen
 
 import control_center as core
 
@@ -39,6 +41,43 @@ SESSION_SECONDS = SESSION_DAYS * 24 * 60 * 60
 PUBLIC_PATHS = {"/login.css", "/icon.svg", "/brand-lockup.svg", "/favicon.ico"}
 UPDATE_REQUEST = Path("/usr/local/sbin/alt-pilot-update-request")
 UPDATE_STATUS = Path("/var/lib/alt-pilot-update/status.json")
+UPDATE_VERSION = Path("/var/lib/alt-pilot-update/version")
+UPDATE_RELEASE_URL = "https://api.github.com/repos/Jlorenzoo/alt-pilot/releases/latest"
+UPDATE_CHECK_INTERVAL = 300
+_UPDATE_RELEASE_LOCK = threading.Lock()
+_update_release_cache: tuple[float, str | None] = (0.0, None)
+
+
+def release_version(tag: str | None) -> tuple[int, ...] | None:
+    if isinstance(tag, str) and re.fullmatch(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)", tag):
+        return tuple(int(part) for part in tag[1:].split("."))
+    return None
+
+
+def latest_update_tag() -> str | None:
+    global _update_release_cache
+    with _UPDATE_RELEASE_LOCK:
+        valid_until, tag = _update_release_cache
+        if time.monotonic() < valid_until:
+            return tag
+        tag = None
+        try:
+            with urlopen(UPDATE_RELEASE_URL, timeout=3) as response:
+                release = json.load(response)
+            if isinstance(release, dict) and release_version(release.get("tag_name")):
+                assets = release.get("assets")
+                archives = [
+                    item for item in assets
+                    if isinstance(item, dict) and item.get("name") == "alt-pilot-vm.tar.gz"
+                ] if isinstance(assets, list) else []
+                if len(archives) == 1 and archives[0].get("state") == "uploaded":
+                    digest = archives[0].get("digest")
+                    if isinstance(digest, str) and re.fullmatch(r"sha256:[a-f0-9]{64}", digest):
+                        tag = release["tag_name"]
+        except (OSError, ValueError):
+            pass
+        _update_release_cache = (time.monotonic() + UPDATE_CHECK_INTERVAL, tag)
+        return tag
 
 
 def update_status() -> dict:
@@ -48,9 +87,22 @@ def update_status() -> dict:
         status = json.loads(UPDATE_STATUS.read_text())
         if status["state"] == "running" and time.time() - UPDATE_STATUS.stat().st_mtime > 31 * 60:
             status["state"] = "failed"
-        return status
     except (OSError, ValueError, KeyError, TypeError):
-        return {"state": "idle"}
+        status = {"state": "idle"}
+    if status["state"] == "running":
+        return status
+    try:
+        installed = release_version(UPDATE_VERSION.read_text(encoding="utf-8").strip())
+    except (OSError, UnicodeError):
+        installed = None
+    if installed is None:
+        installed = release_version(status.get("version"))
+    if installed is not None:
+        tag = latest_update_tag()
+        latest = release_version(tag)
+        if latest is not None and latest > installed:
+            status["available_version"] = tag
+    return status
 
 
 def _hash_token(token: str) -> str:
